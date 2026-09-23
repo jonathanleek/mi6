@@ -8,10 +8,12 @@ Decided on 2026-09-23:
 
 - Audience: solo consultants. Teams later, maybe.
 - Go, macOS and Linux. Homebrew tap once it works.
-- A `.mi6/` folder anywhere from the repo up to the home directory is a layer.
-  No config repo, no roots, no config file of `mi6`'s own.
+- A `.mi6/` folder anywhere from the repo up to the filesystem root is a
+  layer, and `~/.mi6/` always is. No config repo, no roots, no config file of
+  `mi6`'s own.
 - Built state under `$XDG_STATE_HOME/mi6`, named by a hash of the stack.
-- `git config mi6.parent` for repos outside the tree.
+- `git config mi6.parent` for repos outside the tree. `git config mi6.trust`
+  before a checkout's own `.mi6/` counts.
 - Tools are Go files in `mi6`. Claude Code and OpenCode in v1.
 - Instructions are `AGENTS.md` in a layer, generated per launch, named per tool.
 - One merge rule: instructions concatenate, skills union, JSON deep-merges
@@ -31,7 +33,8 @@ someone can copy.
 
 `mi6 resolve` prints the stack and is tested. Done when it is right for a
 repo in the tree, a worktree of that repo, a repo with `mi6.parent` set, a
-repo outside the tree, and a plain directory.
+repo outside the tree, a plain directory, and a repo with its own `.mi6/`
+both with and without `mi6.trust`.
 
 - Go module, `cmd/mi6`.
 - A `resolve` package: find the main checkout, apply `mi6.parent`, walk up,
@@ -55,7 +58,7 @@ second run with no config change writes nothing.
 `mi6 <tool>` starts the real tool. Done when Claude Code and OpenCode each
 start under a set and show the stack's instructions and skills.
 
-- Reserved subcommand names. `--no-domain`. Argument pass-through. `exec`.
+- Reserved subcommand names. `--bare`. Argument pass-through. `exec`.
 - A fake tool under `testdata/bin/` that prints its environment and exits, so
   the launch path is tested without either real tool.
 - A manual checklist in `docs/verify.md` for the two real tools, with the
