@@ -1,0 +1,5 @@
+{
+	"permissions": {
+		"allow": ["Write(~/.local/state/mi6/**)", "Write(~/Documents/git/**/.mi6/**)"]
+	}
+}
