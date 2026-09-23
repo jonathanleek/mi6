@@ -1,8 +1,14 @@
 # Build plan
 
-Four milestones. Each ends in a commit that is reviewed before the next
-starts. [The design](design.md) is the spec. When the two disagree, fix the
-design first.
+Each milestone ends in a commit that is reviewed before the next starts.
+[The design](design.md) is the spec. When the two disagree, fix the design
+first.
+
+Installing `mi6`, creating the `.mi6` symlinks into a private layer repo, and
+wiring the shell so a bare `claude` goes through `mi6` are the user's own
+setup. None of that lives in this repo.
+
+## v1: done on 2026-09-23
 
 Decided on 2026-09-23:
 
@@ -23,13 +29,13 @@ Decided on 2026-09-23:
 - Out of v1: a known config repo, skill sources, accounts, network contexts,
   per-tool environment, model policy, plugins, `doctor`.
 
-## 1. Design and example (done)
+### 1. Design and example (done)
 
 Docs only. Done when the design reflects every decision above, the dropped
 features sit under Later with a sketch each, and `examples/` shows a tree
 someone can copy.
 
-## 2. Resolve (done)
+### 2. Resolve (done)
 
 `mi6 resolve` prints the stack and is tested. Done when it is right for a
 repo in the tree, a worktree of that repo, a repo with `mi6.parent` set, a
@@ -41,7 +47,7 @@ both with and without `mi6.trust`.
   collect layers.
 - Tests that create temporary trees, git repos, and worktrees.
 
-## 3. Build (done)
+### 3. Build (done)
 
 `mi6 resolve` also writes a set for both tools, and is tested. Done when a
 second run with no config change writes nothing.
@@ -53,7 +59,7 @@ second run with no config change writes nothing.
 - A `set` package: compute the target tree, diff it against disk, apply.
 - Golden-file tests: fixture layers in, expected set out.
 
-## 4. Launch (done)
+### 4. Launch (done)
 
 `mi6 <tool>` starts the real tool. Done when Claude Code and OpenCode each
 start under a set and show the stack's instructions and skills.
@@ -64,13 +70,67 @@ start under a set and show the stack's instructions and skills.
 - A manual checklist in `docs/verify.md` for the two real tools, with the
   items from the design's last section.
 
-After v1, in the bootstrap repo, not here: install `mi6`, clone the private
-layer repo, create the `.mi6` symlinks, install the shell aliases.
+## v2
 
-## After v1: compare with other tools
+Decided on 2026-09-23. Five milestones, in this order. 5 comes before 6
+because the model check needs a set with a login. 7 and 8 are independent.
+9 is last because everything before it changes the README.
 
-A README section that says what `mi6` does that the nearby tools don't, so a
-reader can tell in a minute whether it is for them. Checked on 2026-09-23.
+### 5. Close the loose ends
+
+- Isolate the OpenCode stall seen in v1. Build a set with one unreachable
+  local MCP server, then one unreachable remote, and time each start. Write
+  the finding into the design's verified list and the OpenCode tool file.
+- The interactive Claude Code check in [verify.md](verify.md): log in under
+  a set and run the list. Only a person can do this. It gates v2.
+
+### 6. Model policy
+
+- Verify that Claude Code honors `availableModels` from a user-level
+  `settings.json`. Needs a set with a login.
+- An intersection rule for `availableModels` in `claude.json` and
+  `enabled_providers` in `opencode.json`, so a nearer layer narrows. Table
+  tests. The design's merge section gets its first per-key exception, with
+  the reason.
+
+### 7. Per-layer environment
+
+- `env.json` in a layer: a flat object of variable names to strings. Merges
+  like any object, nearest wins per key. Exported on launch after the tool's
+  own variables, so it cannot override them. A leading `~` in a value
+  expands.
+- `mi6 resolve` prints the merged variables. The golden test and the example
+  get one.
+
+### 8. `mi6 doctor`
+
+- Checks each tool on the PATH with its version, the state directory is
+  writable, every layer in the current stack parses, no skill collisions,
+  and `MI6_TOOL` is not already set. Non-zero exit on any failure so a setup
+  script can gate on it.
+- Nothing about shell hooks or aliases.
+
+### 9. Ship it
+
+- CI: `go test` and `go vet` on every pull request.
+- GoReleaser with version stamping, a tag-driven release, and a Homebrew
+  tap. Unsigned binaries to start.
+- README polish, including the comparison below.
+
+### Not in v2
+
+- **Accounts.** Per-set login is the daily cost. The fix needs a token
+  source. Decide after living with it.
+- **More layer content.** `rules/`, `agents/`, `commands/`. Wait until one
+  is missed.
+- **Plugins.** Nobody has asked.
+- **A third tool.** When someone runs one.
+
+## README: compare with other tools
+
+Goes into the README in milestone 9. Says what `mi6` does that the nearby
+tools don't, so a reader can tell in a minute whether it is for them.
+Checked on 2026-09-23.
 
 Two families exist. Claude Code profile switchers, such as
 [claude-profile-manager](https://github.com/JakubKontra/claude-profile-manager)
