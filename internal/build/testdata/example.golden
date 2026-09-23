@@ -1,0 +1,141 @@
+== claude/.claude.json
+{
+  "mcpServers": {
+    "github": {
+      "args": [
+        "mcp",
+        "serve"
+      ],
+      "command": "gh"
+    },
+    "globex-warehouse": {
+      "type": "http",
+      "url": "https://mcp.globex.example/sse"
+    }
+  }
+}
+== claude/CLAUDE.md
+<!-- mi6 layer: $EXAMPLES/home/.mi6 -->
+
+# This machine
+
+This machine runs local models through LM Studio on port 1234.
+
+<!-- mi6 layer: $EXAMPLES/tree/.mi6 -->
+
+# Every repo in this tree
+
+- Commit messages: a concise subject line and a body that says why.
+- Never commit secrets. Source them from a gitignored file.
+- Repo and directory names use kebab-case.
+- A deny rule here reaches every repo below and no layer can lift it, so
+  keep this list short.
+
+<!-- mi6 layer: $EXAMPLES/tree/work/.mi6 -->
+
+# Work
+
+Projects for the employer. Use the work GitHub account for anything pushed.
+
+<!-- mi6 layer: $EXAMPLES/tree/work/clients/.mi6 -->
+
+# Client work
+
+These repos belong to clients. Never add agent config files to the repo.
+Never push. Prepare commits and stop.
+
+<!-- mi6 layer: $EXAMPLES/tree/work/clients/globex/.mi6 -->
+
+# Globex
+
+Globex runs everything in one monorepo. The pipelines are under `dags/`.
+Their style guide is at `docs/style.md` in the repo.
+== claude/settings.json
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(make *)",
+      "Bash(docker compose *)"
+    ],
+    "deny": [
+      "Read(~/.ssh/**)",
+      "Bash(git push *)"
+    ]
+  }
+}
+== claude/skills/repo-conventions -> $EXAMPLES/tree/.mi6/skills/repo-conventions
+== layers
+$EXAMPLES/home/.mi6
+$EXAMPLES/tree/.mi6
+$EXAMPLES/tree/work/.mi6
+$EXAMPLES/tree/work/clients/.mi6
+$EXAMPLES/tree/work/clients/globex/.mi6
+== opencode/AGENTS.md
+<!-- mi6 layer: $EXAMPLES/home/.mi6 -->
+
+# This machine
+
+This machine runs local models through LM Studio on port 1234.
+
+<!-- mi6 layer: $EXAMPLES/tree/.mi6 -->
+
+# Every repo in this tree
+
+- Commit messages: a concise subject line and a body that says why.
+- Never commit secrets. Source them from a gitignored file.
+- Repo and directory names use kebab-case.
+- A deny rule here reaches every repo below and no layer can lift it, so
+  keep this list short.
+
+<!-- mi6 layer: $EXAMPLES/tree/work/.mi6 -->
+
+# Work
+
+Projects for the employer. Use the work GitHub account for anything pushed.
+
+<!-- mi6 layer: $EXAMPLES/tree/work/clients/.mi6 -->
+
+# Client work
+
+These repos belong to clients. Never add agent config files to the repo.
+Never push. Prepare commits and stop.
+
+<!-- mi6 layer: $EXAMPLES/tree/work/clients/globex/.mi6 -->
+
+# Globex
+
+Globex runs everything in one monorepo. The pipelines are under `dags/`.
+Their style guide is at `docs/style.md` in the repo.
+== opencode/opencode.json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "github": {
+      "command": [
+        "gh",
+        "mcp",
+        "serve"
+      ],
+      "enabled": true,
+      "type": "local"
+    },
+    "globex-warehouse": {
+      "enabled": true,
+      "type": "remote",
+      "url": "https://mcp.globex.example/sse"
+    }
+  },
+  "model": "anthropic/claude-sonnet-5",
+  "provider": {
+    "lmstudio": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "http://127.0.0.1:1234/v1"
+      }
+    }
+  }
+}
+== opencode/skills/repo-conventions -> $EXAMPLES/tree/.mi6/skills/repo-conventions

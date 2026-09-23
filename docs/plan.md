@@ -41,7 +41,7 @@ both with and without `mi6.trust`.
   collect layers.
 - Tests that create temporary trees, git repos, and worktrees.
 
-## 3. Build
+## 3. Build (done)
 
 `mi6 resolve` also writes a set for both tools, and is tested. Done when a
 second run with no config change writes nothing.

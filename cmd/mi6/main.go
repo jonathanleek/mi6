@@ -5,7 +5,10 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"sort"
 
+	"github.com/jonathanleek/mi6/internal/build"
 	"github.com/jonathanleek/mi6/internal/resolve"
 )
 
@@ -15,7 +18,7 @@ var version = "dev"
 const usage = `usage:
   mi6 <tool> [args...]     start a tool under the config stack for this directory
   mi6 --bare <tool> [args] start a tool with its plain user config
-  mi6 resolve [dir]        print the stack for a directory
+  mi6 resolve [dir]        print the stack for a directory and build its set
   mi6 help
   mi6 version
 `
@@ -74,7 +77,55 @@ func runResolve(args []string) int {
 		return 1
 	}
 	printStack(st, home)
+
+	r, err := build.Build(st, build.Options{Home: home})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "mi6:", err)
+		return 1
+	}
+	printBuild(r, home)
 	return 0
+}
+
+func printBuild(r *build.Result, home string) {
+	fmt.Println()
+	fmt.Printf("set        %s\n", resolve.DisplayPath(r.Dir, home))
+	for _, name := range append([]string{"set"}, toolNames(r)...) {
+		changes := r.Changes[name]
+		if name == "set" && len(changes) == 0 {
+			continue
+		}
+		label := name
+		if name == "set" {
+			label = "layers"
+		}
+		switch len(changes) {
+		case 0:
+			fmt.Printf("  %-9s up to date\n", label)
+		case 1:
+			rel, _ := filepath.Rel(r.Dir, changes[0].Path)
+			fmt.Printf("  %-9s %s %s\n", label, changes[0].What, rel)
+		default:
+			fmt.Printf("  %-9s %d changes\n", label, len(changes))
+		}
+	}
+	if n := len(r.Merged.Skills); n > 0 {
+		fmt.Printf("  skills    %d\n", n)
+	}
+	for _, w := range r.Merged.Warnings {
+		fmt.Printf("warning  %s\n", w)
+	}
+}
+
+func toolNames(r *build.Result) []string {
+	var names []string
+	for n := range r.Changes {
+		if n != "set" {
+			names = append(names, n)
+		}
+	}
+	sort.Strings(names)
+	return names
 }
 
 func printStack(st *resolve.Stack, home string) {

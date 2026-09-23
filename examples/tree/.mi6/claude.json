@@ -1,6 +1,6 @@
 {
 	"permissions": {
 		"allow": ["Bash(git status)", "Bash(git diff *)", "Bash(git log *)"],
-		"deny": ["Read(~/.ssh/**)", "Write(~/.local/state/mi6/**)"]
+		"deny": ["Read(~/.ssh/**)"]
 	}
 }

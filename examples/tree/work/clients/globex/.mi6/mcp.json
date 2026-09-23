@@ -1,5 +1,5 @@
 {
 	"mcpServers": {
-		"globex-warehouse": {"url": "https://mcp.globex.example/sse"}
+		"globex-warehouse": {"type": "http", "url": "https://mcp.globex.example/sse"}
 	}
 }
