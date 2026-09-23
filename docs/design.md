@@ -53,9 +53,10 @@ the repo and points the tool at it.
 ## The idea
 
 A `.mi6/` folder anywhere in the tree is a **layer**. `mi6` finds the repo's
-main checkout, walks up from it to your home directory, and every `.mi6/` it
-passes is a layer. The layers stack, top of the tree first, and the stack is
-built into one config directory per tool. That is the whole design.
+main checkout, walks up from it, and every `.mi6/` it passes is a layer.
+`~/.mi6/` is always the first layer, whether or not the walk passes through
+home. The layers stack, top of the tree first, and the stack is built into
+one config directory per tool. That is the whole design.
 
 ```
 ~/.mi6/                                  every repo on this machine
@@ -66,8 +67,9 @@ built into one config directory per tool. That is the whole design.
 ```
 
 A repo under `globex/` gets all five. A repo under `personal/` gets the first
-two and `personal/.mi6/` if there is one. A repo outside the tree gets
-`~/.mi6/` alone.
+two and `personal/.mi6/` if there is one. A repo outside the tree, or on
+another volume, gets `~/.mi6/` and whatever lies between it and the root of
+its own filesystem.
 
 ## Terms
 
@@ -111,12 +113,34 @@ must remove something, that is the moment to add a per-key rule, not before.
 2. If `git config mi6.parent` is set, walk up from that folder instead of the
    checkout's parent. This is how a repo outside the tree joins it. The
    setting is per clone, lives in `.git/config`, and is never committed.
-3. Take the `.mi6/` inside the checkout, if there is one, then every `.mi6/`
-   from the parent up to the home directory.
+3. Start with `~/.mi6/`. Then add every `.mi6/` from the filesystem root down
+   to the checkout's parent, skipping `~/.mi6/` if the walk passes it again.
+4. Add the `.mi6/` inside the checkout, if there is one and the clone is
+   trusted. See the next section.
 
-A `.mi6/` inside a repo is a layer like any other. In your own repos, commit
-it or not as you like. In a client repo, list it in `.git/info/exclude`, which
-is per clone. `mi6` reads a checkout and never writes into one.
+### A layer inside the checkout is untrusted until you say otherwise
+
+Every layer above the repo is a folder you made. The checkout is the one
+place in the stack that someone else writes to. A cloned repo's
+`.mi6/mcp.json` is a command that runs on your machine when the tool starts,
+its `claude.json` can widen permissions, and its `AGENTS.md` is text the
+agent follows. Claude Code shows you a repo's `.mcp.json` and asks before
+using it. `mi6` would merge the file into the set before the tool ever ran.
+
+So a checkout's `.mi6/` counts only when the clone says so:
+
+```
+git config mi6.trust true
+```
+
+The setting lives in the clone's `.git/config`, so it never arrives with a
+clone and is never committed. Without it, `mi6` skips the folder and
+`mi6 resolve` prints one line saying it did. Set it once in your own repos.
+In a client repo, read the folder first, then decide.
+
+In your own repos, commit the folder or not as you like. In a client repo,
+list it in `.git/info/exclude`, which is per clone. `mi6` reads a checkout
+and never writes into one.
 
 ## Built sets
 
@@ -133,7 +157,9 @@ Inside a set:
   because they merge several layers. An edit is live on the next launch.
 - **Everything the tool writes for itself** stays in the set: session history,
   the sign-in, auto-memory, caches. Each set is a separate install of the tool
-  as far as the tool can tell. Log in once per set.
+  as far as the tool can tell. Claude Code asks you to log in once per set.
+  OpenCode keeps its provider logins outside the config directory, so they
+  carry over.
 
 The refresh compares what is on disk with what it would write and touches
 nothing that matches, so a launch with no config change costs a few file
@@ -156,9 +182,17 @@ merges the key in and leaves the rest alone.
 `OPENCODE_CONFIG` at `<set>/opencode/opencode.json`. The build writes
 `AGENTS.md` from the merged instructions, `opencode.json` from the merged
 `opencode.json` files with the `mcp` key filled from the merged `mcp.json`,
-and `skills/<name>` links. The generated `opencode.json` also lists the
-generated `AGENTS.md` under `instructions`, since the docs describe the global
-rules file only at the default location.
+and `skills/<name>` links.
+
+OpenCode differs from Claude Code in two ways that the launcher has to know:
+
+- `OPENCODE_CONFIG_DIR` adds a directory. It does not replace
+  `~/.config/opencode`, which OpenCode keeps reading. So an OpenCode session
+  under `mi6` sees your global config with the set merged on top. Keep the
+  global file small, or move its contents into `~/.mi6/`.
+- OpenCode scans `~/.claude/skills` and `~/.agents/skills` on its own. `mi6`
+  sets `OPENCODE_DISABLE_EXTERNAL_SKILLS=1` so the set's skills are the
+  whole list, the same as for Claude Code.
 
 The `mcp.json` shape is Claude Code's. The OpenCode tool file translates it:
 a `command` entry becomes `type: local` with the command and arguments as one
@@ -174,8 +208,8 @@ arguments through.
 came from, and the set's location. It builds the set too, so a setup script
 can call it.
 
-`mi6 --no-domain <tool>` skips the stack and starts the tool with its plain
-user config. Use it to repair a broken layer from inside the tool.
+`mi6 --bare <tool>` skips the stack and starts the tool with its plain user
+config. Use it to repair a broken layer from inside the tool.
 
 `resolve`, `help`, and `version` are reserved names. Any other first argument
 is a tool.
@@ -215,6 +249,9 @@ needs two things from you:
 - Make sure `mi6` is on the `PATH` of whatever shell the tool spawns. Termic
   runs a login shell, so `.zprofile` is the file that matters there.
 
+A worktree whose main checkout has been moved or deleted cannot resolve.
+`mi6` then uses `~/.mi6/` alone and says why.
+
 ## Later
 
 These were in earlier designs and are out on purpose. Each has a reason and a
@@ -226,10 +263,11 @@ sketch, so it can come back without re-deciding it.
   concepts. Revisit if the symlink setup turns out to be a burden.
 - **Skill sources.** A layer that names a git repo, cloned and pulled by
   `mi6`. A symlink under `skills/` to a checkout you already have covers it.
-- **Accounts.** Each set has its own login today. Whether Claude Code's macOS
-  login lives in a file or in the Keychain, and whether the Keychain entry
-  follows `CLAUDE_CONFIG_DIR`, is unverified. Find out on a real machine
-  before designing this.
+- **Accounts.** Each set has its own Claude Code login. That is verified:
+  a fresh config directory starts logged out. Claude Code can also take a
+  long-lived token from `claude setup-token` through the environment, so a
+  layer that names an account could have `mi6` export that account's token.
+  Not needed until logging in per set becomes a burden.
 - **Network contexts.** A layer that applies because of where the machine is:
   on the home network, on its VPN, or away. The general form is a layer plus
   a probe script that exits 0 when the context applies. Dropped because it is
@@ -249,14 +287,26 @@ sketch, so it can come back without re-deciding it.
 - **Teams.** A shared layer repo with per-user layers on top. The stack does
   not preclude it.
 
-## Checked before relying on it
+## Verified on this machine
 
-- OpenCode reads `AGENTS.md` from `OPENCODE_CONFIG_DIR`. The docs name only
-  `~/.config/opencode/AGENTS.md`. The `instructions` key is the fallback.
-- OpenCode reads `skills/` from `OPENCODE_CONFIG_DIR`. The docs list agents,
-  commands, modes, and plugins for that variable and the plural folders for
-  `.opencode`.
-- Claude Code writes `.claude.json` under `CLAUDE_CONFIG_DIR` and keeps the
-  `mcpServers` key that the build merges in.
-- `git rev-parse --git-common-dir` returns the main checkout's `.git` from
-  inside a Termic task and a Conductor workspace.
+Checked on 2026-09-23 with Claude Code 2.1.281 and OpenCode 1.18.30.
+
+- Claude Code under a fresh `CLAUDE_CONFIG_DIR` starts logged out. The login
+  does not follow from `~/.claude`.
+- Claude Code reads `mcpServers` from a `.claude.json` that `mi6` wrote
+  before the first start, and merges its own keys into that file without
+  dropping the servers.
+- OpenCode reads `AGENTS.md` from `OPENCODE_CONFIG_DIR` as instructions, with
+  no `instructions` key. A model run answered with the marker from that file.
+- OpenCode reads `skills/` from `OPENCODE_CONFIG_DIR`.
+- OpenCode keeps reading `~/.config/opencode` with `OPENCODE_CONFIG_DIR`
+  set, and scans `~/.claude/skills` unless told not to.
+- `git rev-parse --git-common-dir` from a Termic task returns the main
+  checkout's `.git` under `~/Documents/git`. A worktree also reads the main
+  clone's `git config`, so `mi6.parent` and `mi6.trust` carry over.
+
+Not yet verified, because it needs a login in a fresh config directory:
+
+- Claude Code loads `CLAUDE.md` and `skills/` from `CLAUDE_CONFIG_DIR`. The
+  docs say every `~/.claude` path moves there. Check after the first login
+  under a set.
