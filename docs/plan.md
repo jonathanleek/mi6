@@ -23,13 +23,13 @@ Decided on 2026-09-23:
 - Out of v1: a known config repo, skill sources, accounts, network contexts,
   per-tool environment, model policy, plugins, `doctor`.
 
-## 1. Design and example
+## 1. Design and example (done)
 
 Docs only. Done when the design reflects every decision above, the dropped
 features sit under Later with a sketch each, and `examples/` shows a tree
 someone can copy.
 
-## 2. Resolve
+## 2. Resolve (done)
 
 `mi6 resolve` prints the stack and is tested. Done when it is right for a
 repo in the tree, a worktree of that repo, a repo with `mi6.parent` set, a
