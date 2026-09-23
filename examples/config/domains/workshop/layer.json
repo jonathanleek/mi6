@@ -1,0 +1,5 @@
+{
+	"skill_sources": [
+		{"repo": "github.com/someone/workshop-skills", "path": "~/Documents/git/workshop/workshop-skills"}
+	]
+}
