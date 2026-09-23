@@ -9,7 +9,8 @@ points the agent at it through the tool's own config-directory variable.
 Nothing is written into the repo, so client repos stay clean, and one edit to
 a folder's instructions or skills reaches every repo below it.
 
-Status: in progress. `mi6 resolve` works. Launching a tool does not yet. Read
+Status: in progress. `mi6 resolve` finds the layers and builds the set.
+Launching a tool does not work yet. Read
 [docs/design.md](docs/design.md) for the problem and the design, and
 [docs/plan.md](docs/plan.md) for the build order.
 
@@ -20,7 +21,8 @@ go build -o bin/mi6 ./cmd/mi6
 go test ./...
 ```
 
-`bin/mi6 resolve` prints the layers that apply to the current directory.
+`bin/mi6 resolve` prints the layers that apply to the current directory and
+builds their set under `~/.local/state/mi6`.
 
 ## Layout
 
@@ -29,3 +31,6 @@ go test ./...
 - `examples/`: a home layer and a tree of layers to copy from.
 - `cmd/mi6`: the command.
 - `internal/resolve`: finds the stack of layers for a directory.
+- `internal/layer`, `internal/merge`: load a layer, merge a stack.
+- `internal/tool`: one file per supported tool.
+- `internal/set`, `internal/build`: write a set and refresh it in place.

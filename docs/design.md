@@ -94,7 +94,7 @@ Any of these, all optional. There is no file that belongs to `mi6` itself.
 One rule covers every file, so a new key in a tool's settings needs no code:
 
 - **Instructions** concatenate, top of the tree first, each block under a
-  heading that names its layer.
+  comment line that names its layer.
 - **Skills** union by name. On a collision the layer nearest the repo wins.
 - **JSON** deep-merges. An object merges key by key. A list unions, keeping
   order and dropping duplicates. Anything else takes the value from the layer
@@ -102,8 +102,11 @@ One rule covers every file, so a new key in a tool's settings needs no code:
 
 A layer nearer the repo can add to a list but not remove from it. That is
 deliberate. A `permissions.deny` entry at the top of the tree reaches every
-set, and no client layer can lift it. If a case turns up where a deeper layer
-must remove something, that is the moment to add a per-key rule, not before.
+set, and no client layer can lift it. The flip side: a deny at the top also
+binds your own repos, since Claude Code lets deny win over allow. Put a deny
+at the level where every repo below it should have it, and nowhere higher.
+If a case turns up where a deeper layer must remove something, that is the
+moment to add a per-key rule, not before.
 
 ## How `mi6` finds the stack
 
@@ -116,7 +119,8 @@ must remove something, that is the moment to add a per-key rule, not before.
 3. Start with `~/.mi6/`. Then add every `.mi6/` from the filesystem root down
    to the checkout's parent, skipping `~/.mi6/` if the walk passes it again.
 4. Add the `.mi6/` inside the checkout, if there is one and the clone is
-   trusted. See the next section.
+   trusted. See the next section. Outside a repo there is no clone to
+   distrust, so a `.mi6/` in the directory itself is an ordinary layer.
 
 ### A layer inside the checkout is untrusted until you say otherwise
 
@@ -146,8 +150,9 @@ and never writes into one.
 
 The build writes one directory per stack and per tool under
 `$XDG_STATE_HOME/mi6`, which defaults to `~/.local/state/mi6`. The directory
-is named by a hash of the stack's layer paths. You never need to look inside
-it. `mi6 resolve` prints its location.
+is named by a hash of the stack's layer paths and holds a `layers` file that
+lists them. You never need to look inside it. `mi6 resolve` prints its
+location.
 
 Inside a set:
 
