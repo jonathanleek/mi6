@@ -309,6 +309,10 @@ Checked on 2026-09-23 with Claude Code 2.1.281 and OpenCode 1.18.30.
 - `git rev-parse --git-common-dir` from a Termic task returns the main
   checkout's `.git` under `~/Documents/git`. A worktree also reads the main
   clone's `git config`, so `mi6.parent` and `mi6.trust` carry over.
+- `mi6 opencode run` in a scratch home answers with the marker from the
+  nearest layer's `AGENTS.md`, using the model from that layer.
+- `mi6 claude -p` in a scratch home reaches Claude Code's login prompt for
+  the set, which shows the real binary ran under `CLAUDE_CONFIG_DIR`.
 
 Not yet verified, because it needs a login in a fresh config directory:
 

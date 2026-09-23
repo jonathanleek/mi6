@@ -53,7 +53,7 @@ second run with no config change writes nothing.
 - A `set` package: compute the target tree, diff it against disk, apply.
 - Golden-file tests: fixture layers in, expected set out.
 
-## 4. Launch
+## 4. Launch (done)
 
 `mi6 <tool>` starts the real tool. Done when Claude Code and OpenCode each
 start under a set and show the stack's instructions and skills.
