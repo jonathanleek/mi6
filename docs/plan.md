@@ -66,3 +66,38 @@ start under a set and show the stack's instructions and skills.
 
 After v1, in the bootstrap repo, not here: install `mi6`, clone the private
 layer repo, create the `.mi6` symlinks, install the shell aliases.
+
+## After v1: compare with other tools
+
+A README section that says what `mi6` does that the nearby tools don't, so a
+reader can tell in a minute whether it is for them. Checked on 2026-09-23.
+
+Two families exist. Claude Code profile switchers, such as
+[claude-profile-manager](https://github.com/JakubKontra/claude-profile-manager)
+and [claude-profile](https://quinnjr.github.io/claude-code-profiles/), use the
+same `CLAUDE_CONFIG_DIR` mechanism with named profiles, a marker file per
+project, and a shell hook that switches on `cd`. Cross-tool config syncers,
+such as [agentsmesh](https://samplexbro.github.io/agentsmesh/),
+[ai-rules-sync](https://github.com/lbb00/ai-rules-sync),
+[rulesync](https://github.com/dyoshikawa/rulesync), and
+[agent-rules-sync](https://github.com/dhruv-anand-aintech/agent-rules-sync),
+write one source of truth into each tool's native files, across many tools.
+[agent-ways](https://github.com/aaronsb/agent-ways) projects a central store
+into `~/.claude` as symlinks, for one global config.
+
+| | profile switchers | config syncers | `mi6` |
+|---|---|---|---|
+| Layers from parent folders | no, one flat profile | no, one config everywhere | yes |
+| Worktree inherits the main checkout's config | no | no | yes |
+| Nothing written into the repo | yes | no, native files in the project | yes |
+| Claude Code and OpenCode from one source | Claude only | yes, many tools | yes, two tools |
+| Skills, MCP, permissions | credentials and env per profile | yes | yes |
+
+The gap is the combination in the last column. Nobody else does more than
+two of the four rows above. The gap is also narrow: it matters to people with
+a folder tree of client work and worktree-based tools, which is the audience
+this was built for.
+
+Two things to borrow. The profile switchers' `cd` hook is a better answer to
+a forgotten `mi6` prefix than a bare alias. The syncers are complementary,
+not competing: author skills with one of them, select them with `mi6`.
