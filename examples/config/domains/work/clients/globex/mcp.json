@@ -1,0 +1,5 @@
+{
+	"mcpServers": {
+		"globex-warehouse": {"url": "https://mcp.globex.example/sse"}
+	}
+}
