@@ -7,8 +7,10 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/jonathanleek/mi6/internal/build"
+	"github.com/jonathanleek/mi6/internal/launch"
 	"github.com/jonathanleek/mi6/internal/resolve"
 )
 
@@ -46,14 +48,21 @@ func run(args []string) int {
 			fmt.Fprint(os.Stderr, usage)
 			return 2
 		}
-		return notYet("--bare " + args[1])
+		return runLaunch(args[1], args[2:], true)
 	default:
-		return notYet(args[0])
+		if strings.HasPrefix(args[0], "-") {
+			fmt.Fprintf(os.Stderr, "mi6: unknown option %s\n%s", args[0], usage)
+			return 2
+		}
+		return runLaunch(args[0], args[1:], false)
 	}
 }
 
-func notYet(what string) int {
-	fmt.Fprintf(os.Stderr, "mi6 %s: launching a tool is not implemented yet\n", what)
+// runLaunch returns only on failure: a successful launch replaces the
+// process.
+func runLaunch(name string, args []string, bare bool) int {
+	err := launch.Run(name, args, launch.Options{Bare: bare})
+	fmt.Fprintln(os.Stderr, "mi6:", err)
 	return 2
 }
 
