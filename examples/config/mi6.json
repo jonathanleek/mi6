@@ -1,4 +1,0 @@
-{
-	"roots": ["~/Documents/git"],
-	"pull": {"every": "1h", "timeout": "10s"}
-}

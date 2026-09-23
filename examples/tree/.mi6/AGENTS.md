@@ -1,6 +1,4 @@
-# Shared
-
-These instructions reach every project on this machine.
+# Every repo in this tree
 
 - Commit messages: a concise subject line and a body that says why.
 - Never commit secrets. Source them from a gitignored file.
