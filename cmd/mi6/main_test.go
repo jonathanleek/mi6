@@ -79,6 +79,10 @@ func fixture(t *testing.T, withLayer bool) (home, state, project string) {
 		if err := os.WriteFile(filepath.Join(layer, "AGENTS.md"), []byte("tree rules\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
+		env := `{"MI6_TEST_VAR": "from-layer", "MI6_TEST_HOME": "~/data", "CLAUDE_CONFIG_DIR": "/hijack"}`
+		if err := os.WriteFile(filepath.Join(layer, "env.json"), []byte(env), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	return home, state, project
 }
@@ -112,6 +116,15 @@ func TestLaunchClaude(t *testing.T) {
 	}
 	if strings.Contains(r.stdout, "OPENCODE") {
 		t.Errorf("opencode variables leaked into a claude launch:\n%s", r.stdout)
+	}
+	if line(t, r.stdout, "MI6_TEST_VAR") != "from-layer" {
+		t.Errorf("layer env not exported:\n%s", r.stdout)
+	}
+	if line(t, r.stdout, "MI6_TEST_HOME") != filepath.Join(home, "data") {
+		t.Errorf("~ in a layer env value not expanded:\n%s", r.stdout)
+	}
+	if strings.Contains(cfg, "hijack") {
+		t.Error("a layer's env.json overrode the tool's config directory")
 	}
 	b, err := os.ReadFile(filepath.Join(cfg, "CLAUDE.md"))
 	if err != nil || !strings.Contains(string(b), "tree rules") {

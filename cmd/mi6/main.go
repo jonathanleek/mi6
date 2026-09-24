@@ -121,6 +121,13 @@ func printBuild(r *build.Result, home string) {
 	if n := len(r.Merged.Skills); n > 0 {
 		fmt.Printf("  skills    %d\n", n)
 	}
+	if len(r.Env) > 0 {
+		fmt.Println()
+		fmt.Println("env")
+		for _, kv := range r.Env {
+			fmt.Printf("  %s\n", kv)
+		}
+	}
 	for _, w := range r.Merged.Warnings {
 		fmt.Printf("warning  %s\n", w)
 	}

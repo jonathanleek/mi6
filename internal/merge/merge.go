@@ -8,6 +8,7 @@
 //   - JSON deep-merges. An object merges key by key. A list unions, keeping
 //     order and dropping duplicates. Anything else takes the value from the
 //     layer nearest the repo.
+//   - Environment variables merge by name, nearest layer wins.
 //
 // One exception: an allowlist of models narrows instead of widening. See
 // Narrowing.
@@ -30,6 +31,8 @@ type Merged struct {
 	MCP      layer.Object
 	Claude   layer.Object
 	OpenCode layer.Object
+	// Env is the merged env.json, nearest layer winning per name.
+	Env map[string]string
 	// Warnings collects per-layer warnings and cross-layer collisions.
 	Warnings []string
 
@@ -39,7 +42,7 @@ type Merged struct {
 // Stack merges layers in order, first applied first. Display names the
 // layer in the instructions header and in warnings.
 func Stack(layers []*layer.Layer, display func(string) string) *Merged {
-	m := &Merged{Skills: map[string]layer.Skill{}}
+	m := &Merged{Skills: map[string]layer.Skill{}, Env: map[string]string{}}
 	var text strings.Builder
 	for _, l := range layers {
 		if l.HasInstructions() {
@@ -62,6 +65,9 @@ func Stack(layers []*layer.Layer, display func(string) string) *Merged {
 		m.OpenCode = m.narrow(m.OpenCode, l.OpenCode, "enabled_providers", display(l.Path))
 		m.OpenCode = JSON(m.OpenCode, l.OpenCode)
 		m.OpenCode = m.apply(m.OpenCode)
+		for k, v := range l.Env {
+			m.Env[k] = v
+		}
 		m.Warnings = append(m.Warnings, l.Warnings...)
 	}
 	m.Instructions = text.String()
@@ -116,6 +122,16 @@ func (m *Merged) apply(obj layer.Object) layer.Object {
 type narrowed struct {
 	key   string
 	value []any
+}
+
+// EnvNames returns the merged variable names, sorted.
+func (m *Merged) EnvNames() []string {
+	names := make([]string, 0, len(m.Env))
+	for n := range m.Env {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	return names
 }
 
 // SkillNames returns the merged skill names, sorted.

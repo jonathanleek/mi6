@@ -72,6 +72,11 @@ Their style guide is at `docs/style.md` in the repo.
   }
 }
 == claude/skills/repo-conventions -> $EXAMPLES/tree/.mi6/skills/repo-conventions
+== env
+GIT_AUTHOR_EMAIL=me@work.example
+GIT_COMMITTER_EMAIL=me@work.example
+GLOBEX_CONFIG=/fake/home/globex/config.yaml
+GLOBEX_ENV=dev
 == layers
 $EXAMPLES/home/.mi6
 $EXAMPLES/tree/.mi6
