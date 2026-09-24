@@ -1,0 +1,44 @@
+version: 2
+
+project_name: mi6
+
+builds:
+  - main: ./cmd/mi6
+    binary: mi6
+    env: [CGO_ENABLED=0]
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
+archives:
+  - formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files: [LICENSE, README.md]
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: github
+  filters:
+    exclude: ["^docs:", "^test:"]
+
+# Publishes a cask to the tap repo on every tagged release. The tap repo
+# must exist, and HOMEBREW_TAP_TOKEN must be a token that can push to it.
+# Binaries are unsigned, so the cask removes the quarantine attribute.
+homebrew_casks:
+  - name: mi6
+    repository:
+      owner: jonathanleek
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    homepage: https://github.com/jonathanleek/mi6
+    description: Per-folder configuration for AI coding agents
+    license: Apache-2.0
+    hooks:
+      post:
+        install: |
+          if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/mi6"]
+          end
