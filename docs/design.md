@@ -326,6 +326,12 @@ Checked on 2026-09-23 with Claude Code 2.1.281 and OpenCode 1.18.30.
 - What follows the login rather than the config directory: the claude.ai
   connectors, and skills from plugins tied to the account. They appear in
   every set. Claude Code's built-in skills appear in every set too.
+- Unreachable MCP servers do not slow OpenCode's start. Four starts through
+  `mi6 opencode run` with no servers, a local server that exits at once, a
+  remote server whose host does not resolve, and both, took between 20 and
+  91 seconds with no MCP error in the logs. The variation, and the
+  six-minute stall seen during v1, was the local model treating the prompt
+  as work to do and editing files in the scratch repo with its tools.
 
 Not yet verified, because it needs a login in a fresh config directory:
 

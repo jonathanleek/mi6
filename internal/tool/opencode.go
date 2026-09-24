@@ -13,7 +13,8 @@ import (
 // OPENCODE_CONFIG_DIR. Two things differ from Claude Code, verified on
 // 1.18.30: that variable adds a directory and OpenCode keeps reading
 // ~/.config/opencode, and OpenCode scans ~/.claude/skills on its own unless
-// told not to.
+// told not to. Unreachable MCP servers in the generated config do not delay
+// its start.
 type OpenCode struct{}
 
 func init() { register(OpenCode{}) }

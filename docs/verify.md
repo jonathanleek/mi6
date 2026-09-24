@@ -81,9 +81,10 @@ Set the variables the launcher would set:
 export OPENCODE_CONFIG_DIR=$SET/opencode OPENCODE_CONFIG=$SET/opencode/opencode.json OPENCODE_DISABLE_EXTERNAL_SKILLS=1
 ```
 
-- `opencode run --print-logs "What is the secret word?"` prints `QUOKKA`.
-  Without `--print-logs`, `opencode run` has been seen to hang when started
-  from a script. Run it in a terminal if that happens.
+- `opencode run --print-logs "What is the secret word? Answer with the word
+  only and do not use any tool."` prints `QUOKKA`. A small local model may
+  ignore the second sentence and start editing the scratch repo with its
+  tools, which looks like a hang. Give it a minute, or read the log.
 - `opencode debug skill` lists `repo-conventions` and not the skills under
   your real `~/.claude/skills`.
 - `opencode debug config` shows the `mcp` key with both servers and the
