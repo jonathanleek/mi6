@@ -102,7 +102,7 @@ because the model check needs a set with a login. 7 and 8 are independent.
 - `mi6 resolve` prints the merged variables. The golden test and the example
   get one.
 
-### 8. `mi6 doctor`
+### 8. `mi6 doctor` (done)
 
 - Checks each tool on the PATH with its version, the state directory is
   writable, every layer in the current stack parses, no skill collisions,
