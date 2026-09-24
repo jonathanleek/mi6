@@ -84,7 +84,7 @@ because the model check needs a set with a login. 7 and 8 are independent.
 - The interactive Claude Code check in [verify.md](verify.md): log in under
   a set and run the list. Only a person can do this. It gates v2.
 
-### 6. Model policy
+### 6. Model policy (done)
 
 - Verify that Claude Code honors `availableModels` from a user-level
   `settings.json`. Needs a set with a login.

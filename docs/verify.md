@@ -65,7 +65,9 @@ SET=$(m resolve | awk '/^set/ {print $2}')
   exit, the scrollback shows nothing of it. That is normal.
 
 `scripts/verify-claude.sh <set dir>` runs the scripted half of this list
-against a set that already has a login.
+against a set that already has a login. `scripts/verify-models.sh <root>`
+checks that a model allowlist in a layer is enforced, where the root is the
+folder holding `home/` and `state/`.
 
 ## OpenCode
 

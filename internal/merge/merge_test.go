@@ -2,6 +2,7 @@ package merge
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -103,5 +104,61 @@ func TestStackEmpty(t *testing.T) {
 	m := Stack(nil, func(s string) string { return s })
 	if m.Instructions != "" || len(m.Skills) != 0 || m.Claude != nil {
 		t.Errorf("empty stack: %+v", m)
+	}
+}
+
+func TestNarrowing(t *testing.T) {
+	display := func(p string) string { return p }
+	cases := []struct {
+		name         string
+		outer, inner string
+		want         string
+		warn         bool
+	}{
+		{"nearer narrows in outer order", `["opus","sonnet","haiku"]`, `["haiku","sonnet"]`, `["sonnet","haiku"]`, false},
+		{"nearer cannot widen", `["sonnet"]`, `["sonnet","opus"]`, `["sonnet"]`, false},
+		{"only outer sets it", `["sonnet"]`, ``, `["sonnet"]`, false},
+		{"only nearer sets it", ``, `["sonnet"]`, `["sonnet"]`, false},
+		{"no match keeps outer and warns", `["claude-sonnet-5"]`, `["sonnet"]`, `["claude-sonnet-5"]`, true},
+		{"empty nearer is ignored", `["sonnet"]`, `[]`, `["sonnet"]`, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var layers []*layer.Layer
+			for i, list := range []string{c.outer, c.inner} {
+				l := &layer.Layer{Path: fmt.Sprintf("/l%d", i)}
+				if list != "" {
+					l.Claude = obj(t, `{"availableModels":`+list+`,"model":"x"}`)
+					l.OpenCode = obj(t, `{"enabled_providers":`+list+`}`)
+				}
+				layers = append(layers, l)
+			}
+			m := Stack(layers, display)
+			for name, got := range map[string]any{"claude": m.Claude["availableModels"], "opencode": m.OpenCode["enabled_providers"]} {
+				gotJSON, _ := json.Marshal(got)
+				if string(gotJSON) != c.want {
+					t.Errorf("%s: got %s, want %s", name, gotJSON, c.want)
+				}
+			}
+			if (len(m.Warnings) > 0) != c.warn {
+				t.Errorf("warnings %v, want warning=%v", m.Warnings, c.warn)
+			}
+			if c.outer != "" && c.inner != "" && m.Claude["model"] != "x" {
+				t.Errorf("other keys must still merge: %v", m.Claude)
+			}
+		})
+	}
+}
+
+func TestNarrowingThreeLayers(t *testing.T) {
+	display := func(p string) string { return p }
+	layers := []*layer.Layer{
+		{Path: "/a", Claude: obj(t, `{"availableModels":["opus","sonnet","haiku"]}`)},
+		{Path: "/b", Claude: obj(t, `{"availableModels":["sonnet","haiku"]}`)},
+		{Path: "/c", Claude: obj(t, `{"availableModels":["haiku","opus"]}`)},
+	}
+	got, _ := json.Marshal(Stack(layers, display).Claude["availableModels"])
+	if string(got) != `["haiku"]` {
+		t.Errorf("got %s, want [\"haiku\"]", got)
 	}
 }
