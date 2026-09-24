@@ -318,6 +318,14 @@ Checked on 2026-09-23 with Claude Code 2.1.281 and OpenCode 1.18.30.
 - Logging in under a set works with the real `HOME` and fails with
   "Keychain Not Found" when `HOME` is overridden, because macOS finds the
   login keychain through `HOME`. `mi6` never sets `HOME`.
+- A full interactive Claude Code session under a set, on 2026-09-24: it
+  reads the set's instructions, lists the set's skills and none from
+  `~/.claude/skills`, lists the set's MCP servers, and applies the merged
+  permissions. `mi6 claude --version` inside the session returns at once.
+  `mi6 --bare claude` starts the usual config with no login prompt.
+- What follows the login rather than the config directory: the claude.ai
+  connectors, and skills from plugins tied to the account. They appear in
+  every set. Claude Code's built-in skills appear in every set too.
 
 Not yet verified, because it needs a login in a fresh config directory:
 

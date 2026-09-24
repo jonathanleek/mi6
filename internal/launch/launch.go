@@ -56,7 +56,9 @@ func Run(name string, args []string, opts Options) error {
 	if err != nil {
 		return fmt.Errorf("%s is not on your PATH", t.Command())
 	}
-	argv := append([]string{path}, args...)
+	// argv[0] is the command as typed, the way a shell passes it, not the
+	// resolved path. A program may look at its own name.
+	argv := append([]string{t.Command()}, args...)
 
 	if opts.Bare {
 		return execFn(path, argv, os.Environ())

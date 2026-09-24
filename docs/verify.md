@@ -51,7 +51,8 @@ SET=$(m resolve | awk '/^set/ {print $2}')
   it says `Not logged in` before the login and answers after it.
 - Ask for the secret word. The answer is `QUOKKA`.
 - Ask which skills are available. The answer names `repo-conventions` and
-  nothing from your real `~/.claude/skills`.
+  nothing from your real `~/.claude/skills`. Claude Code's built-in skills
+  and any that come with your account appear too. That is not a leak.
 - `/mcp` lists `github` and `globex-warehouse`. They need not connect.
 - `/permissions` shows the merged allow and deny lists, with
   `Bash(git push *)` denied and `Bash(make *)` allowed.
@@ -60,7 +61,11 @@ SET=$(m resolve | awk '/^set/ {print $2}')
   building anything, because `MI6_TOOL` is set.
 - Exit. From the same directory, `bin/mi6 --bare claude` by its full path,
   with no `HOME` override, starts your usual Claude Code with no login
-  prompt.
+  prompt. Claude Code runs in the terminal's alternate screen, so after you
+  exit, the scrollback shows nothing of it. That is normal.
+
+`scripts/verify-claude.sh <set dir>` runs the scripted half of this list
+against a set that already has a login.
 
 ## OpenCode
 
