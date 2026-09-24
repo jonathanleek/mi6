@@ -8,6 +8,9 @@
 //   - JSON deep-merges. An object merges key by key. A list unions, keeping
 //     order and dropping duplicates. Anything else takes the value from the
 //     layer nearest the repo.
+//
+// One exception: an allowlist of models narrows instead of widening. See
+// Narrowing.
 package merge
 
 import (
@@ -29,6 +32,8 @@ type Merged struct {
 	OpenCode layer.Object
 	// Warnings collects per-layer warnings and cross-layer collisions.
 	Warnings []string
+
+	pending *narrowed
 }
 
 // Stack merges layers in order, first applied first. Display names the
@@ -51,13 +56,66 @@ func Stack(layers []*layer.Layer, display func(string) string) *Merged {
 			m.Skills[name] = s
 		}
 		m.MCP = JSON(m.MCP, l.MCP)
+		m.Claude = m.narrow(m.Claude, l.Claude, "availableModels", display(l.Path))
 		m.Claude = JSON(m.Claude, l.Claude)
+		m.Claude = m.apply(m.Claude)
+		m.OpenCode = m.narrow(m.OpenCode, l.OpenCode, "enabled_providers", display(l.Path))
 		m.OpenCode = JSON(m.OpenCode, l.OpenCode)
+		m.OpenCode = m.apply(m.OpenCode)
 		m.Warnings = append(m.Warnings, l.Warnings...)
 	}
 	m.Instructions = text.String()
 	sort.Strings(m.Warnings)
 	return m
+}
+
+// Narrowing is the one per-key exception to the list rule. The keys are
+// allowlists of models: availableModels for Claude Code and enabled_providers
+// for OpenCode. Under the union rule a nearer layer could only widen them,
+// which is backwards for an allowlist. So when both layers set the key, the
+// result is the entries of the outer list that the nearer list also names,
+// in the outer list's order. Matching is by exact string. If nothing matches,
+// the outer list stays and a warning says so, since an empty allowlist would
+// block every model and a mismatch such as "sonnet" against
+// "claude-sonnet-5" is more likely a typo than an intent. An empty nearer
+// list is ignored for the same reason.
+
+// narrow records the narrowed value for key, if both objects set it, so
+// that apply can put it back after JSON has unioned the lists.
+func (m *Merged) narrow(base, over layer.Object, key, layerName string) layer.Object {
+	m.pending = nil
+	outer, ok1 := base[key].([]any)
+	inner, ok2 := over[key].([]any)
+	if !ok1 || !ok2 || len(inner) == 0 {
+		return base
+	}
+	var kept []any
+	for _, v := range outer {
+		if contains(inner, v) {
+			kept = append(kept, v)
+		}
+	}
+	if len(kept) == 0 {
+		m.Warnings = append(m.Warnings, fmt.Sprintf("%s in %s shares no entry with the layer above; keeping the outer list", key, layerName))
+		kept = outer
+	}
+	m.pending = &narrowed{key: key, value: kept}
+	return base
+}
+
+// apply puts the narrowed value recorded by narrow into obj.
+func (m *Merged) apply(obj layer.Object) layer.Object {
+	if m.pending == nil {
+		return obj
+	}
+	obj[m.pending.key] = m.pending.value
+	m.pending = nil
+	return obj
+}
+
+type narrowed struct {
+	key   string
+	value []any
 }
 
 // SkillNames returns the merged skill names, sorted.

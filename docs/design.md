@@ -105,8 +105,22 @@ deliberate. A `permissions.deny` entry at the top of the tree reaches every
 set, and no client layer can lift it. The flip side: a deny at the top also
 binds your own repos, since Claude Code lets deny win over allow. Put a deny
 at the level where every repo below it should have it, and nowhere higher.
-If a case turns up where a deeper layer must remove something, that is the
-moment to add a per-key rule, not before.
+
+There is one exception, for allowlists of models: `availableModels` in
+`claude.json` and `enabled_providers` in `opencode.json`. Under the union
+rule a nearer layer could only widen them, which is backwards for an
+allowlist. So when two layers set one of these keys, the result is the
+entries of the outer list that the nearer list also names, in the outer
+list's order. A client layer can allow fewer models than the tree, never
+more. Matching is by exact string. If nothing matches, the outer list stays
+and `mi6 resolve` warns, since an empty allowlist would block every model
+and a mismatch such as `sonnet` against `claude-sonnet-5` is more likely a
+typo than an intent.
+
+Claude Code honors `availableModels` from a user-level settings file, which
+is where a set puts it: a `--model` outside the list is replaced at start
+and `/model` refuses the switch. `enforceAvailableModels: true` in the same
+file makes the default model obey the list too. Both are verified below.
 
 ## How `mi6` finds the stack
 
@@ -282,11 +296,6 @@ sketch, so it can come back without re-deciding it.
 - **Per-tool environment.** A layer that exports variables to the tool, such
   as `ASTRO_HOME` for a client's Astronomer organization. Dropped because it
   serves one user.
-- **Model policy.** A layer listing allowed models, turned into
-  `availableModels` for Claude Code and `enabled_providers` for OpenCode.
-  Claude Code merges `availableModels` from user settings rather than
-  replacing it, so enforcement is advisory. Put the keys in `claude.json` by
-  hand until this matters.
 - **Plugins.** Claude Code installs plugins into the config directory with its
   own command, so a set would have to run that command at build time.
 - **`mi6 doctor`.** A check of the tools on the path and the shell aliases.
@@ -326,6 +335,10 @@ Checked on 2026-09-23 with Claude Code 2.1.281 and OpenCode 1.18.30.
 - What follows the login rather than the config directory: the claude.ai
   connectors, and skills from plugins tied to the account. They appear in
   every set. Claude Code's built-in skills appear in every set too.
+- `availableModels` in a set's `settings.json` is enforced, on 2026-09-24:
+  with `["sonnet"]` and `enforceAvailableModels: true` in a layer,
+  `claude --model opus -p` answered as Sonnet, and so did a start with no
+  model named. `scripts/verify-models.sh` repeats the check.
 - Unreachable MCP servers do not slow OpenCode's start. Four starts through
   `mi6 opencode run` with no servers, a local server that exits at once, a
   remote server whose host does not resolve, and both, took between 20 and
