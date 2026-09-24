@@ -76,7 +76,7 @@ Decided on 2026-09-23. Five milestones, in this order. 5 comes before 6
 because the model check needs a set with a login. 7 and 8 are independent.
 9 is last because everything before it changes the README.
 
-### 5. Close the loose ends
+### 5. Close the loose ends (done)
 
 - Isolate the OpenCode stall seen in v1. Build a set with one unreachable
   local MCP server, then one unreachable remote, and time each start. Write
