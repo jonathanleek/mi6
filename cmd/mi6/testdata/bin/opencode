@@ -1,0 +1,6 @@
+#!/bin/sh
+# Fake opencode for tests: print what a launcher handed us, then exit.
+echo "TOOL=opencode"
+echo "PWD=$(pwd)"
+echo "ARGS=$*"
+env | grep -E '^(CLAUDE_CONFIG_DIR|OPENCODE_CONFIG|OPENCODE_CONFIG_DIR|OPENCODE_DISABLE_EXTERNAL_SKILLS|MI6_TOOL|MI6_SET|MI6_TEST_[A-Z]*)=' | sort
