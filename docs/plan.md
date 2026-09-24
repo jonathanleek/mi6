@@ -110,7 +110,7 @@ because the model check needs a set with a login. 7 and 8 are independent.
   script can gate on it.
 - Nothing about shell hooks or aliases.
 
-### 9. Ship it
+### 9. Ship it (in progress)
 
 - CI: `go test` and `go vet` on every pull request.
 - GoReleaser with version stamping, a tag-driven release, and a Homebrew
@@ -128,36 +128,4 @@ because the model check needs a set with a login. 7 and 8 are independent.
 
 ## README: compare with other tools
 
-Goes into the README in milestone 9. Says what `mi6` does that the nearby
-tools don't, so a reader can tell in a minute whether it is for them.
-Checked on 2026-09-23.
-
-Two families exist. Claude Code profile switchers, such as
-[claude-profile-manager](https://github.com/JakubKontra/claude-profile-manager)
-and [claude-profile](https://quinnjr.github.io/claude-code-profiles/), use the
-same `CLAUDE_CONFIG_DIR` mechanism with named profiles, a marker file per
-project, and a shell hook that switches on `cd`. Cross-tool config syncers,
-such as [agentsmesh](https://samplexbro.github.io/agentsmesh/),
-[ai-rules-sync](https://github.com/lbb00/ai-rules-sync),
-[rulesync](https://github.com/dyoshikawa/rulesync), and
-[agent-rules-sync](https://github.com/dhruv-anand-aintech/agent-rules-sync),
-write one source of truth into each tool's native files, across many tools.
-[agent-ways](https://github.com/aaronsb/agent-ways) projects a central store
-into `~/.claude` as symlinks, for one global config.
-
-| | profile switchers | config syncers | `mi6` |
-|---|---|---|---|
-| Layers from parent folders | no, one flat profile | no, one config everywhere | yes |
-| Worktree inherits the main checkout's config | no | no | yes |
-| Nothing written into the repo | yes | no, native files in the project | yes |
-| Claude Code and OpenCode from one source | Claude only | yes, many tools | yes, two tools |
-| Skills, MCP, permissions | credentials and env per profile | yes | yes |
-
-The gap is the combination in the last column. Nobody else does more than
-two of the four rows above. The gap is also narrow: it matters to people with
-a folder tree of client work and worktree-based tools, which is the audience
-this was built for.
-
-Two things to borrow. The profile switchers' `cd` hook is a better answer to
-a forgotten `mi6` prefix than a bare alias. The syncers are complementary,
-not competing: author skills with one of them, select them with `mi6`.
+Done in milestone 9. The comparison lives in the README.
