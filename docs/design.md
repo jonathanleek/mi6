@@ -235,8 +235,14 @@ too, so a setup script can call it.
 `mi6 --bare <tool>` skips the stack and starts the tool with its plain user
 config. Use it to repair a broken layer from inside the tool.
 
-`resolve`, `help`, and `version` are reserved names. Any other first argument
-is a tool.
+`mi6 doctor` checks that a launch from the current directory would work:
+git and each tool on the path with their versions, the state directory
+writable, every layer in the stack parses, no skill collisions, and whether
+this shell is already inside a tool that `mi6` started. It exits non-zero
+on a failure, so a setup script can gate on it. Warnings do not fail it.
+
+`resolve`, `doctor`, `help`, and `version` are reserved names. Any other
+first argument is a tool.
 
 ## What happens without `mi6`
 
@@ -300,8 +306,6 @@ sketch, so it can come back without re-deciding it.
   specific to one setup.
 - **Plugins.** Claude Code installs plugins into the config directory with its
   own command, so a set would have to run that command at build time.
-- **`mi6 doctor`.** A check of the tools on the path and the shell aliases.
-  Add it when there is something to diagnose.
 - **Teams.** A shared layer repo with per-user layers on top. The stack does
   not preclude it.
 

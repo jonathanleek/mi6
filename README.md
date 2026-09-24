@@ -23,8 +23,9 @@ go test ./...
 
 `bin/mi6 resolve` prints the layers that apply to the current directory and
 builds their set under `~/.local/state/mi6`. `bin/mi6 claude` and
-`bin/mi6 opencode` start the tool under that set. Put `bin/` on your `PATH`,
-or install with `go install ./cmd/mi6`.
+`bin/mi6 opencode` start the tool under that set. `bin/mi6 doctor` says
+whether a launch from here would work. Put `bin/` on your `PATH`, or install
+with `go install ./cmd/mi6`.
 
 ## Layout
 
@@ -37,3 +38,4 @@ or install with `go install ./cmd/mi6`.
 - `internal/tool`: one file per supported tool.
 - `internal/set`, `internal/build`: write a set and refresh it in place.
 - `internal/launch`: export the tool's variables and replace the process.
+- `internal/doctor`: the checks behind `mi6 doctor`.

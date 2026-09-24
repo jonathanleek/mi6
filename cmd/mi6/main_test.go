@@ -239,3 +239,70 @@ func TestResolveAndVersion(t *testing.T) {
 		t.Errorf("version: %q", r.stdout)
 	}
 }
+
+func TestDoctor(t *testing.T) {
+	home, state, project := fixture(t, true)
+	r := mi6(t, home, state, project, nil, "doctor")
+	if r.code != 0 {
+		t.Fatalf("exit %d\n%s%s", r.code, r.stdout, r.stderr)
+	}
+	for _, want := range []string{"ok    git", "ok    claude", "ok    opencode", "ok    state", "ok    layers   1 apply here", "ok    skills", "ok    session"} {
+		if !strings.Contains(r.stdout, want) {
+			t.Errorf("missing %q in:\n%s", want, r.stdout)
+		}
+	}
+	if strings.Contains(r.stdout, "fail") || strings.Contains(r.stdout, "warn") {
+		t.Errorf("unexpected fail or warn:\n%s", r.stdout)
+	}
+}
+
+func TestDoctorNoLayers(t *testing.T) {
+	home, state, project := fixture(t, false)
+	r := mi6(t, home, state, project, nil, "doctor")
+	if r.code != 0 || !strings.Contains(r.stdout, "warn  layers   none apply") {
+		t.Errorf("exit %d\n%s", r.code, r.stdout)
+	}
+}
+
+func TestDoctorBrokenLayerFails(t *testing.T) {
+	home, state, project := fixture(t, true)
+	if err := os.WriteFile(filepath.Join(home, "git", ".mi6", "claude.json"), []byte("{oops"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r := mi6(t, home, state, project, nil, "doctor")
+	if r.code != 1 || !strings.Contains(r.stdout, "fail  layer") || !strings.Contains(r.stdout, "claude.json") {
+		t.Errorf("exit %d\n%s", r.code, r.stdout)
+	}
+}
+
+func TestDoctorMissingToolFails(t *testing.T) {
+	home, state, project := fixture(t, true)
+	cmd := exec.Command(binary, "doctor")
+	cmd.Dir = project
+	// git only, no fake tools.
+	cmd.Env = []string{"PATH=" + filepath.Dir(gitPath(t)), "HOME=" + home, "XDG_STATE_HOME=" + state}
+	out, err := cmd.Output()
+	if e, ok := err.(*exec.ExitError); !ok || e.ExitCode() != 1 {
+		t.Fatalf("err %v\n%s", err, out)
+	}
+	if !strings.Contains(string(out), "fail  claude   claude is not on your PATH") {
+		t.Errorf("out:\n%s", out)
+	}
+}
+
+func TestDoctorInsideSessionWarns(t *testing.T) {
+	home, state, project := fixture(t, true)
+	r := mi6(t, home, state, project, []string{"MI6_TOOL=claude"}, "doctor")
+	if r.code != 0 || !strings.Contains(r.stdout, "warn  session  MI6_TOOL=claude") {
+		t.Errorf("exit %d\n%s", r.code, r.stdout)
+	}
+}
+
+func gitPath(t *testing.T) string {
+	t.Helper()
+	p, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
