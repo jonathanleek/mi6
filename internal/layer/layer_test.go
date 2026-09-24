@@ -129,3 +129,21 @@ func TestBadJSON(t *testing.T) {
 		t.Errorf("err %v", err)
 	}
 }
+
+func TestEnv(t *testing.T) {
+	dir := t.TempDir()
+	write(t, filepath.Join(dir, "env.json"), `{"A": "1", "B": "~/x"}`)
+	l, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if l.Env["A"] != "1" || l.Env["B"] != "~/x" {
+		t.Errorf("env %v", l.Env)
+	}
+
+	dir = t.TempDir()
+	write(t, filepath.Join(dir, "env.json"), `{"A": 1}`)
+	if _, err := Load(dir); err == nil || !strings.Contains(err.Error(), "not a string") {
+		t.Errorf("err %v", err)
+	}
+}

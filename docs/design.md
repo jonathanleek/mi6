@@ -88,6 +88,7 @@ Any of these, all optional. There is no file that belongs to `mi6` itself.
 | `mcp.json` | MCP servers, in Claude Code's `mcpServers` shape. |
 | `claude.json` | Claude Code settings, including permissions. The same shape as `settings.json`. |
 | `opencode.json` | OpenCode settings. |
+| `env.json` | Variables to export to the tool. A flat object of names to strings. A leading `~` in a value expands to your home directory. |
 
 ## How layers merge
 
@@ -99,6 +100,7 @@ One rule covers every file, so a new key in a tool's settings needs no code:
 - **JSON** deep-merges. An object merges key by key. A list unions, keeping
   order and dropping duplicates. Anything else takes the value from the layer
   nearest the repo.
+- **Variables** merge by name. The layer nearest the repo wins.
 
 A layer nearer the repo can add to a list but not remove from it. That is
 deliberate. A `permissions.deny` entry at the top of the tree reaches every
@@ -165,8 +167,8 @@ and never writes into one.
 The build writes one directory per stack and per tool under
 `$XDG_STATE_HOME/mi6`, which defaults to `~/.local/state/mi6`. The directory
 is named by a hash of the stack's layer paths and holds a `layers` file that
-lists them. You never need to look inside it. `mi6 resolve` prints its
-location.
+lists them and an `env` file with the merged variables. You never need to
+look inside it. `mi6 resolve` prints its location.
 
 Inside a set:
 
@@ -220,12 +222,15 @@ list, a `url` entry becomes `type: remote`.
 ## The command
 
 `mi6 <tool> [args]` resolves the stack, builds or refreshes the set, exports
-the tool's variables, and replaces itself with the tool, passing the
-arguments through.
+the layers' variables and then the tool's own, and replaces itself with the
+tool, passing the arguments through. The tool's variables go last, so a
+layer's `env.json` cannot point the tool away from its set. Two more
+variables go with them: `MI6_TOOL` with the tool's name and `MI6_SET` with
+the set's directory.
 
 `mi6 resolve` prints the stack for the current directory, where each layer
-came from, and the set's location. It builds the set too, so a setup script
-can call it.
+came from, the set's location, and the merged variables. It builds the set
+too, so a setup script can call it.
 
 `mi6 --bare <tool>` skips the stack and starts the tool with its plain user
 config. Use it to repair a broken layer from inside the tool.
@@ -293,9 +298,6 @@ sketch, so it can come back without re-deciding it.
   on the home network, on its VPN, or away. The general form is a layer plus
   a probe script that exits 0 when the context applies. Dropped because it is
   specific to one setup.
-- **Per-tool environment.** A layer that exports variables to the tool, such
-  as `ASTRO_HOME` for a client's Astronomer organization. Dropped because it
-  serves one user.
 - **Plugins.** Claude Code installs plugins into the config directory with its
   own command, so a set would have to run that command at build time.
 - **`mi6 doctor`.** A check of the tools on the path and the shell aliases.

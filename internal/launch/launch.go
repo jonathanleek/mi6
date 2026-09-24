@@ -96,8 +96,11 @@ func Run(name string, args []string, opts Options) error {
 		fmt.Fprintln(stderr, "mi6: warning:", w)
 	}
 
+	// The layers' variables first, then the tool's own, so a layer cannot
+	// redirect the tool away from its set.
 	dir := r.ToolDir(t)
-	env := withVars(os.Environ(), append(t.Env(dir), ToolVar+"="+name, SetVar+"="+r.Dir))
+	env := withVars(os.Environ(), r.Env)
+	env = withVars(env, append(t.Env(dir), ToolVar+"="+name, SetVar+"="+r.Dir))
 	return execFn(path, argv, env)
 }
 

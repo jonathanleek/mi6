@@ -23,6 +23,9 @@ type Result struct {
 	Dir     string
 	Merged  *merge.Merged
 	Changes map[string][]set.Change
+	// Env is the merged env.json with a leading ~ in each value expanded to
+	// the home directory, as KEY=VALUE, sorted by name.
+	Env []string
 }
 
 // ToolDir is the directory for one tool inside the set.
@@ -56,6 +59,17 @@ func SetDir(stateDir string, st *resolve.Stack) string {
 	return filepath.Join(stateDir, "sets", hex.EncodeToString(h.Sum(nil))[:12])
 }
 
+// expandHome replaces a leading ~ or ~/ in v with home.
+func expandHome(v, home string) string {
+	if v == "~" {
+		return home
+	}
+	if strings.HasPrefix(v, "~/") {
+		return filepath.Join(home, v[2:])
+	}
+	return v
+}
+
 // Build loads the stack's layers, merges them, and writes or refreshes the
 // set for each tool.
 func Build(st *resolve.Stack, opts Options) (*Result, error) {
@@ -87,13 +101,23 @@ func Build(st *resolve.Stack, opts Options) (*Result, error) {
 	m := merge.Stack(layers, display)
 
 	r := &Result{Dir: SetDir(stateDir, st), Merged: m, Changes: map[string][]set.Change{}}
+	for _, name := range m.EnvNames() {
+		r.Env = append(r.Env, name+"="+expandHome(m.Env[name], home))
+	}
 
-	// A file that lists the layers, so the hashed directory name can be read.
-	var listing strings.Builder
+	// A file that lists the layers, so the hashed directory name can be read,
+	// and one with the variables, so a script can source what a launch sets.
+	var listing, envFile strings.Builder
 	for _, l := range st.Layers {
 		fmt.Fprintf(&listing, "%s\n", l.Path)
 	}
-	changes, err := set.Apply(&set.Plan{Files: []set.File{{Path: filepath.Join(r.Dir, "layers"), Content: []byte(listing.String())}}})
+	for _, kv := range r.Env {
+		fmt.Fprintf(&envFile, "%s\n", kv)
+	}
+	changes, err := set.Apply(&set.Plan{Files: []set.File{
+		{Path: filepath.Join(r.Dir, "layers"), Content: []byte(listing.String())},
+		{Path: filepath.Join(r.Dir, "env"), Content: []byte(envFile.String())},
+	}})
 	if err != nil {
 		return nil, err
 	}

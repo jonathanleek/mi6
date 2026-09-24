@@ -93,7 +93,7 @@ because the model check needs a set with a login. 7 and 8 are independent.
   tests. The design's merge section gets its first per-key exception, with
   the reason.
 
-### 7. Per-layer environment
+### 7. Per-layer environment (done)
 
 - `env.json` in a layer: a flat object of variable names to strings. Merges
   like any object, nearest wins per key. Exported on launch after the tool's

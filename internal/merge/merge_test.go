@@ -162,3 +162,19 @@ func TestNarrowingThreeLayers(t *testing.T) {
 		t.Errorf("got %s, want [\"haiku\"]", got)
 	}
 }
+
+func TestEnvNearestWins(t *testing.T) {
+	layers := []*layer.Layer{
+		{Path: "/a", Env: map[string]string{"A": "outer", "B": "outer"}},
+		{Path: "/b"},
+		{Path: "/c", Env: map[string]string{"B": "inner", "C": "inner"}},
+	}
+	m := Stack(layers, func(s string) string { return s })
+	want := map[string]string{"A": "outer", "B": "inner", "C": "inner"}
+	if !reflect.DeepEqual(m.Env, want) {
+		t.Errorf("env %v, want %v", m.Env, want)
+	}
+	if !reflect.DeepEqual(m.EnvNames(), []string{"A", "B", "C"}) {
+		t.Errorf("names %v", m.EnvNames())
+	}
+}

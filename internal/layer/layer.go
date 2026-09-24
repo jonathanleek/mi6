@@ -8,6 +8,8 @@
 //	mcp.json                  MCP servers, in Claude Code's mcpServers shape
 //	claude.json               Claude Code settings
 //	opencode.json             OpenCode settings
+//	env.json                  variables to export to the tool, a flat object
+//	                          of names to strings
 package layer
 
 import (
@@ -41,6 +43,8 @@ type Layer struct {
 	MCP      Object
 	Claude   Object
 	OpenCode Object
+	// Env is env.json, or nil.
+	Env      map[string]string
 	Warnings []string
 }
 
@@ -74,6 +78,21 @@ func Load(path string) (*Layer, error) {
 
 	if err := l.loadSkills(filepath.Join(path, "skills")); err != nil {
 		return nil, err
+	}
+
+	envObj, err := loadObject(filepath.Join(path, "env.json"))
+	if err != nil {
+		return nil, err
+	}
+	if envObj != nil {
+		l.Env = map[string]string{}
+		for k, v := range envObj {
+			s, ok := v.(string)
+			if !ok {
+				return nil, fmt.Errorf("%s: %s is not a string", filepath.Join(path, "env.json"), k)
+			}
+			l.Env[k] = s
+		}
 	}
 	return l, nil
 }
