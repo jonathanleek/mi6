@@ -269,7 +269,9 @@ sketch, so it can come back without re-deciding it.
 - **Skill sources.** A layer that names a git repo, cloned and pulled by
   `mi6`. A symlink under `skills/` to a checkout you already have covers it.
 - **Accounts.** Each set has its own Claude Code login. That is verified:
-  a fresh config directory starts logged out. Claude Code can also take a
+  a fresh config directory starts logged out, and on macOS the login is a
+  Keychain item keyed to the config directory, not a file in it. So there
+  is no credential file to share between sets. Claude Code can take a
   long-lived token from `claude setup-token` through the environment, so a
   layer that names an account could have `mi6` export that account's token.
   Not needed until logging in per set becomes a burden.
@@ -313,6 +315,9 @@ Checked on 2026-09-23 with Claude Code 2.1.281 and OpenCode 1.18.30.
   nearest layer's `AGENTS.md`, using the model from that layer.
 - `mi6 claude -p` in a scratch home reaches Claude Code's login prompt for
   the set, which shows the real binary ran under `CLAUDE_CONFIG_DIR`.
+- Logging in under a set works with the real `HOME` and fails with
+  "Keychain Not Found" when `HOME` is overridden, because macOS finds the
+  login keychain through `HOME`. `mi6` never sets `HOME`.
 
 Not yet verified, because it needs a login in a fresh config directory:
 

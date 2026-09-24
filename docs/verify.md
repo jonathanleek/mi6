@@ -25,6 +25,16 @@ echo 'The secret word is QUOKKA. If asked for it, reply with it and nothing else
   > $SB/home/Documents/git/work/clients/globex/.mi6/AGENTS.md
 ```
 
+`m` overrides `HOME` so the walk finds the scratch layers. Use it to resolve
+and build. Do not start a real tool through it on macOS: the Keychain lives
+under `HOME`, and Claude Code's login fails with "Keychain Not Found" when
+`HOME` points at a folder with no keychain. Start the tools with your real
+`HOME` and only the config directory pointed at the set:
+
+```
+SET=$(m resolve | awk '/^set/ {print $2}')
+```
+
 ## Resolve
 
 - `m resolve` lists five layers, home first, globex last.
@@ -34,18 +44,23 @@ echo 'The secret word is QUOKKA. If asked for it, reply with it and nothing else
 
 ## Claude Code
 
-- `m claude` starts. The first start in a set asks you to log in. Log in.
-  For a scripted check, `m claude -p "hi" < /dev/null` says `Not logged in`
-  before the login and answers after it.
+- `CLAUDE_CONFIG_DIR=$SET/claude MI6_TOOL=claude claude` starts. The first
+  start in a set asks you to log in. Log in. The login is stored in the
+  Keychain, keyed to this config directory, so your usual login is not
+  reused and not disturbed. For a scripted check, add `-p "hi" < /dev/null`:
+  it says `Not logged in` before the login and answers after it.
 - Ask for the secret word. The answer is `QUOKKA`.
-- `/skills` or a question about available skills shows `repo-conventions`.
+- Ask which skills are available. The answer names `repo-conventions` and
+  nothing from your real `~/.claude/skills`.
 - `/mcp` lists `github` and `globex-warehouse`. They need not connect.
 - `/permissions` shows the merged allow and deny lists, with
-  `Bash(git push *)` denied.
-- In a second terminal, `m --bare claude` starts with your usual config and
-  no login prompt.
-- Inside the Claude session, run `mi6 claude version` in its shell tool. It
-  reports the version without building anything, because `MI6_TOOL` is set.
+  `Bash(git push *)` denied and `Bash(make *)` allowed.
+- Inside the session, have Claude run `bin/mi6 claude --version` by its full
+  path in its shell tool. It reports the Claude Code version without
+  building anything, because `MI6_TOOL` is set.
+- Exit. From the same directory, `bin/mi6 --bare claude` by its full path,
+  with no `HOME` override, starts your usual Claude Code with no login
+  prompt.
 
 ## OpenCode
 
@@ -55,13 +70,21 @@ the work layer sets an Anthropic model that wins over it, since the nearest
 layer wins. Put a model you can reach in the globex layer's `opencode.json`
 in the scratch home, or change the provider in `~/.mi6/opencode.json`.
 
-- `m opencode run --print-logs "What is the secret word?"` prints `QUOKKA`.
+Set the variables the launcher would set:
+
+```
+export OPENCODE_CONFIG_DIR=$SET/opencode OPENCODE_CONFIG=$SET/opencode/opencode.json OPENCODE_DISABLE_EXTERNAL_SKILLS=1
+```
+
+- `opencode run --print-logs "What is the secret word?"` prints `QUOKKA`.
   Without `--print-logs`, `opencode run` has been seen to hang when started
   from a script. Run it in a terminal if that happens.
-- `m opencode debug skill` lists `repo-conventions` and not the skills under
+- `opencode debug skill` lists `repo-conventions` and not the skills under
   your real `~/.claude/skills`.
-- `m opencode debug config` shows the `mcp` key with both servers and the
+- `opencode debug config` shows the `mcp` key with both servers and the
   model from the layers.
+- `unset OPENCODE_CONFIG_DIR OPENCODE_CONFIG OPENCODE_DISABLE_EXTERNAL_SKILLS`
+  when done.
 
 ## Worktrees
 
