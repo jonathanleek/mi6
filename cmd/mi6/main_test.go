@@ -306,3 +306,34 @@ func gitPath(t *testing.T) string {
 	}
 	return p
 }
+
+func TestInit(t *testing.T) {
+	home, state, project := fixture(t, false)
+	r := mi6(t, home, state, project, nil, "init")
+	if r.code != 0 {
+		t.Fatalf("exit %d\n%s%s", r.code, r.stdout, r.stderr)
+	}
+	for _, want := range []string{"layer      ~/git/proj/.mi6", "created  AGENTS.md", "created  claude.json", "created  skills/README.md"} {
+		if !strings.Contains(r.stdout, want) {
+			t.Errorf("missing %q in:\n%s", want, r.stdout)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(project, ".mi6", "env.json")); err != nil {
+		t.Error("env.json not created")
+	}
+
+	// The new layer resolves. It is inside a plain directory, not a repo, so
+	// no trust is needed and no hint is printed.
+	if strings.Contains(r.stdout, "note") {
+		t.Errorf("hint outside a repo:\n%s", r.stdout)
+	}
+	r = mi6(t, home, state, project, nil, "resolve")
+	if !strings.Contains(r.stdout, "~/git/proj/.mi6") {
+		t.Errorf("new layer not in the stack:\n%s", r.stdout)
+	}
+
+	r = mi6(t, home, state, project, nil, "init")
+	if r.code != 0 || strings.Contains(r.stdout, "created") || !strings.Contains(r.stdout, "kept     AGENTS.md") {
+		t.Errorf("second init:\n%s", r.stdout)
+	}
+}

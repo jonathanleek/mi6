@@ -13,6 +13,7 @@ import (
 	"github.com/jonathanleek/mi6/internal/doctor"
 	"github.com/jonathanleek/mi6/internal/launch"
 	"github.com/jonathanleek/mi6/internal/resolve"
+	"github.com/jonathanleek/mi6/internal/scaffold"
 )
 
 // version is set by the release build with -ldflags "-X main.version=...".
@@ -21,6 +22,7 @@ var version = "dev"
 const usage = `usage:
   mi6 <tool> [args...]     start a tool under the config stack for this directory
   mi6 --bare <tool> [args] start a tool with its plain user config
+  mi6 init [dir]           create a .mi6 layer in a directory, with every file mi6 reads
   mi6 resolve [dir]        print the stack for a directory and build its set
   mi6 doctor [dir]         check that a launch from a directory would work
   mi6 help
@@ -47,6 +49,8 @@ func run(args []string) int {
 		return runResolve(args[1:])
 	case "doctor":
 		return runDoctor(args[1:])
+	case "init":
+		return runInit(args[1:])
 	case "--bare":
 		if len(args) < 2 {
 			fmt.Fprint(os.Stderr, usage)
@@ -68,6 +72,38 @@ func runLaunch(name string, args []string, bare bool) int {
 	err := launch.Run(name, args, launch.Options{Bare: bare})
 	fmt.Fprintln(os.Stderr, "mi6:", err)
 	return 2
+}
+
+func runInit(args []string) int {
+	if len(args) > 1 {
+		fmt.Fprint(os.Stderr, "usage: mi6 init [dir]\n")
+		return 2
+	}
+	dir := "."
+	if len(args) == 1 {
+		dir = args[0]
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "mi6:", err)
+		return 1
+	}
+	r, err := scaffold.Create(dir, home)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "mi6:", err)
+		return 1
+	}
+	fmt.Printf("layer      %s\n", resolve.DisplayPath(r.Dir, home))
+	for _, f := range r.Created {
+		fmt.Printf("  created  %s\n", f)
+	}
+	for _, f := range r.Kept {
+		fmt.Printf("  kept     %s\n", f)
+	}
+	if r.Hint != "" {
+		fmt.Printf("\nnote  %s\n", r.Hint)
+	}
+	return 0
 }
 
 func runDoctor(args []string) int {
