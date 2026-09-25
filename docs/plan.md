@@ -110,7 +110,9 @@ because the model check needs a set with a login. 7 and 8 are independent.
   script can gate on it.
 - Nothing about shell hooks or aliases.
 
-### 9. Ship it (in progress)
+### 9. Ship it (done, except the first release)
+
+The tap repo, its token, and the first tag are on hold.
 
 - CI: `go test` and `go vet` on every pull request.
 - GoReleaser with version stamping, a tag-driven release, and a Homebrew

@@ -7,15 +7,18 @@ untouched.
 
 ## Set up a scratch home
 
+Run this from the `mi6` repo, after `go build -o bin/mi6 ./cmd/mi6`:
+
 ```
 export SB=$(mktemp -d)/sandbox
+export MI6=$PWD/bin/mi6
 mkdir -p $SB/home/Documents $SB/state
 cp -R examples/home/.mi6 $SB/home/.mi6
 cp -R examples/tree $SB/home/Documents/git
 mkdir -p $SB/home/Documents/git/work/clients/globex/pipeline
 git -C $SB/home/Documents/git/work/clients/globex/pipeline init -q
 cd $SB/home/Documents/git/work/clients/globex/pipeline
-alias m="HOME=$SB/home XDG_STATE_HOME=$SB/state $OLDPWD/bin/mi6"
+m() { HOME=$SB/home XDG_STATE_HOME=$SB/state $MI6 "$@"; }
 ```
 
 Put a marker in a layer so you can tell the tool read it:
@@ -56,11 +59,11 @@ SET=$(m resolve | awk '/^set/ {print $2}')
 - `/mcp` lists `github` and `globex-warehouse`. They need not connect.
 - `/permissions` shows the merged allow and deny lists, with
   `Bash(git push *)` denied and `Bash(make *)` allowed.
-- Inside the session, have Claude run `bin/mi6 claude --version` by its full
+- Inside the session, have Claude run `$MI6 claude --version` by its full
   path in its shell tool. It reports the Claude Code version without
   building anything, because `MI6_TOOL` is set.
-- Exit. From the same directory, `bin/mi6 --bare claude` by its full path,
-  with no `HOME` override, starts your usual Claude Code with no login
+- Exit. From the same directory, `$MI6 --bare claude`, with no `HOME`
+  override, starts your usual Claude Code with no login
   prompt. Claude Code runs in the terminal's alternate screen, so after you
   exit, the scrollback shows nothing of it. That is normal.
 

@@ -1,7 +1,8 @@
 # Layers: per-folder agent configuration
 
-Status: design. Nothing in this document is implemented yet. [The plan](plan.md)
-says in what order it gets built.
+This is the design behind `mi6`, and the record of what was checked against
+the real tools. For how to install and start, read the [README](../README.md).
+For the order things were built in, read [the plan](plan.md).
 
 ## The problem
 
@@ -13,7 +14,6 @@ You keep repos in one tree, grouped by who the work is for:
 	work/
 	work/clients/globex/
 	workshop/
-	meta/
 ```
 
 Every repo under a folder should get the same agent setup with no per-project
@@ -190,8 +190,8 @@ reads.
 
 A tool is a Go file in `mi6` that knows four things: the environment variable
 that moves the tool's config, the files the tool reads from that directory,
-where MCP servers go, and how to start the tool. Two ship in v1. Adding a
-third is a pull request.
+where MCP servers go, and how to start the tool. Two ship: Claude Code and
+OpenCode. Adding a third is a pull request.
 
 **Claude Code.** `CLAUDE_CONFIG_DIR` points at `<set>/claude/`. The build
 writes `CLAUDE.md` from the merged instructions, `settings.json` from the
@@ -252,18 +252,29 @@ settings, or login. The risk is a client repo opened with your personal
 permissions because you forgot the prefix. The fix is a shell alias, `claude`
 to `mi6 claude`.
 
-## Two machines
+## Where the layers live
 
-`mi6` never syncs anything. Where your layers live and how they travel
-between machines is yours to decide. Two patterns:
+A layer is a folder in your tree. That is the whole answer, and for one
+machine it is enough: make the folders, put files in them, done. There is no
+config repo, no setting that names one, and nothing to clone. `mi6` finds
+the folders by walking up from the repo you are in.
 
-- **Symlinks into a private repo.** Keep the layers in one git repo, and make
-  each `.mi6/` in the tree a symlink into it. A setup script creates the
-  links once. Client names stay in a private repo, and a pull on either
-  machine updates every layer.
-- **`~/.mi6/` is the machine layer.** The home directory is not synced, so
-  the layer there holds what differs per machine, such as a local model
-  server's address.
+Two machines change that, because the tree is not a git repo and the
+folders do not travel on their own. The pattern is:
+
+- Keep the layers in a private git repo of your own, laid out like the tree:
+  `tree/.mi6/`, `tree/work/.mi6/`, and so on, plus `home/.mi6/`.
+- On each machine, make each `.mi6/` in the tree a symlink into that repo.
+  A short script does it once. Client names stay in the private repo, and a
+  pull on either machine updates every layer.
+- Keep what differs per machine, such as a local model server's address,
+  in `~/.mi6/`, and do not link that one.
+
+`mi6` never knows the repo exists. It sees folders, some of which happen to
+be symlinks. If the repo that holds your layers lives inside the tree, an
+agent working on it needs write access to `.mi6/` folders, which the tree's
+own layers may deny. Give that repo's folder a layer that allows the
+writes.
 
 Do not put the state directory in iCloud Drive, Dropbox, or Syncthing. It
 holds symlink farms and session databases, and file sync corrupts both.
@@ -311,7 +322,8 @@ sketch, so it can come back without re-deciding it.
 
 ## Verified on this machine
 
-Checked on 2026-09-23 with Claude Code 2.1.281 and OpenCode 1.18.30.
+Checked on 2026-09-23 and 2026-09-24 with Claude Code 2.1.281 and OpenCode
+1.18.30.
 
 - Claude Code under a fresh `CLAUDE_CONFIG_DIR` starts logged out. The login
   does not follow from `~/.claude`.
@@ -351,9 +363,3 @@ Checked on 2026-09-23 with Claude Code 2.1.281 and OpenCode 1.18.30.
   91 seconds with no MCP error in the logs. The variation, and the
   six-minute stall seen during v1, was the local model treating the prompt
   as work to do and editing files in the scratch repo with its tools.
-
-Not yet verified, because it needs a login in a fresh config directory:
-
-- Claude Code loads `CLAUDE.md` and `skills/` from `CLAUDE_CONFIG_DIR`. The
-  docs say every `~/.claude` path moves there. Check after the first login
-  under a set.
