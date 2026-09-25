@@ -53,16 +53,9 @@ separate login. `mi6 --bare claude` starts the tool with its plain config.
 
 ## Where the layers live
 
-In your tree. A layer is a folder, and for one machine that is the whole
-setup: make the folders, put files in them, done. There is no config repo
-and nothing to clone. `mi6` finds the folders by walking up from the repo
-you are in.
-
-If you work on two machines, keep the layers in a private git repo of your
-own, laid out like the tree, and symlink each `.mi6/` in the tree to it. A
-five-line script does it once per machine. `mi6` never knows the repo
-exists. [The design](docs/design.md#where-the-layers-live) has the
-details.
+In your tree. A layer is a folder: make the folders, put files in them,
+done. There is no config repo and nothing to clone. `mi6` finds the folders
+by walking up from the repo you are in.
 
 ## What a layer holds
 

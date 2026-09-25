@@ -254,27 +254,10 @@ to `mi6 claude`.
 
 ## Where the layers live
 
-A layer is a folder in your tree. That is the whole answer, and for one
-machine it is enough: make the folders, put files in them, done. There is no
-config repo, no setting that names one, and nothing to clone. `mi6` finds
-the folders by walking up from the repo you are in.
-
-Two machines change that, because the tree is not a git repo and the
-folders do not travel on their own. The pattern is:
-
-- Keep the layers in a private git repo of your own, laid out like the tree:
-  `tree/.mi6/`, `tree/work/.mi6/`, and so on, plus `home/.mi6/`.
-- On each machine, make each `.mi6/` in the tree a symlink into that repo.
-  A short script does it once. Client names stay in the private repo, and a
-  pull on either machine updates every layer.
-- Keep what differs per machine, such as a local model server's address,
-  in `~/.mi6/`, and do not link that one.
-
-`mi6` never knows the repo exists. It sees folders, some of which happen to
-be symlinks. If the repo that holds your layers lives inside the tree, an
-agent working on it needs write access to `.mi6/` folders, which the tree's
-own layers may deny. Give that repo's folder a layer that allows the
-writes.
+A layer is a folder in your tree. That is the whole answer: make the
+folders, put files in them, done. There is no config repo, no setting that
+names one, and nothing to clone. `mi6` finds the folders by walking up from
+the repo you are in.
 
 Do not put the state directory in iCloud Drive, Dropbox, or Syncthing. It
 holds symlink farms and session databases, and file sync corrupts both.
@@ -298,10 +281,11 @@ A worktree whose main checkout has been moved or deleted cannot resolve.
 These were in earlier designs and are out on purpose. Each has a reason and a
 sketch, so it can come back without re-deciding it.
 
-- **A config repo `mi6` knows about.** The earlier design mirrored the tree
-  in a separate repo, with roots, a config path, and an hourly pull. Symlinks
-  from the tree into a private repo give the same result with no `mi6`
-  concepts. Revisit if the symlink setup turns out to be a burden.
+- **Syncing layers between machines.** The tree is not a git repo, so the
+  folders do not travel on their own. The earlier design mirrored the tree
+  in a separate repo that `mi6` pulled, and that was dropped for the
+  complexity it brought. Whatever comes back should be a first-class
+  feature, designed on its own, not a pattern the user assembles.
 - **Skill sources.** A layer that names a git repo, cloned and pulled by
   `mi6`. A symlink under `skills/` to a checkout you already have covers it.
 - **Accounts.** Each set has its own Claude Code login. That is verified:
