@@ -228,6 +228,12 @@ layer's `env.json` cannot point the tool away from its set. Two more
 variables go with them: `MI6_TOOL` with the tool's name and `MI6_SET` with
 the set's directory.
 
+`mi6 init [dir]` creates `.mi6/` in a directory with every file `mi6`
+reads, each empty but valid, plus a README that says what each one is and
+that `mi6` ignores. It never overwrites: a second run reports every file as
+kept. At a git checkout's root it prints the `mi6.trust` hint, since that
+layer does not count until the clone is trusted.
+
 `mi6 resolve` prints the stack for the current directory, where each layer
 came from, the set's location, and the merged variables. It builds the set
 too, so a setup script can call it.
@@ -241,8 +247,8 @@ writable, every layer in the stack parses, no skill collisions, and whether
 this shell is already inside a tool that `mi6` started. It exits non-zero
 on a failure, so a setup script can gate on it. Warnings do not fail it.
 
-`resolve`, `doctor`, `help`, and `version` are reserved names. Any other
-first argument is a tool.
+`init`, `resolve`, `doctor`, `help`, and `version` are reserved names. Any
+other first argument is a tool.
 
 ## What happens without `mi6`
 

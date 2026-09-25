@@ -33,12 +33,16 @@ whether a launch from the current directory would work.
 
 ## Start
 
-Make a layer and put instructions in it:
+Make a layer:
 
 ```
-mkdir -p ~/.mi6
-echo '# Every repo' > ~/.mi6/AGENTS.md
+mi6 init ~
 ```
+
+That creates `~/.mi6/` with every file `mi6` reads, each empty but valid,
+and a README saying what each one is. Put your instructions in its
+`AGENTS.md`. Run `mi6 init` in any folder of your tree to give the repos
+below it a layer of their own.
 
 Then, in any repo:
 
