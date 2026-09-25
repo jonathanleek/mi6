@@ -25,17 +25,11 @@ gets the same stack as its main checkout.
 ## Install
 
 ```
-brew install jonathanleek/tap/mi6
-```
-
-Or with Go:
-
-```
 go install github.com/jonathanleek/mi6/cmd/mi6@latest
 ```
 
-Then `mi6 doctor` says whether a launch from the current directory would
-work.
+A Homebrew tap comes with the first tagged release. Then `mi6 doctor` says
+whether a launch from the current directory would work.
 
 ## Start
 
@@ -56,6 +50,12 @@ mi6 opencode   # OpenCode, under that set
 
 The first Claude Code start under a set asks you to log in. Each set is a
 separate login. `mi6 --bare claude` starts the tool with its plain config.
+
+## Where the layers live
+
+In your tree. A layer is a folder: make the folders, put files in them,
+done. There is no config repo and nothing to clone. `mi6` finds the folders
+by walking up from the repo you are in.
 
 ## What a layer holds
 
