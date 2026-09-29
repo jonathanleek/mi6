@@ -89,6 +89,7 @@ Any of these, all optional. There is no file that belongs to `mi6` itself.
 | `claude.json` | Claude Code settings, including permissions. The same shape as `settings.json`. |
 | `opencode.json` | OpenCode settings. |
 | `env.json` | Variables to export to the tool. A flat object of names to strings. A leading `~` in a value expands to your home directory. |
+| `models.json` | Model tags and the rules that allow or deny them. See [Model policy](#model-policy). |
 
 ## How layers merge
 
@@ -108,21 +109,208 @@ set, and no client layer can lift it. The flip side: a deny at the top also
 binds your own repos, since Claude Code lets deny win over allow. Put a deny
 at the level where every repo below it should have it, and nowhere higher.
 
-There is one exception, for allowlists of models: `availableModels` in
-`claude.json` and `enabled_providers` in `opencode.json`. Under the union
-rule a nearer layer could only widen them, which is backwards for an
-allowlist. So when two layers set one of these keys, the result is the
-entries of the outer list that the nearer list also names, in the outer
-list's order. A client layer can allow fewer models than the tree, never
-more. Matching is by exact string. If nothing matches, the outer list stays
-and `mi6 resolve` warns, since an empty allowlist would block every model
-and a mismatch such as `sonnet` against `claude-sonnet-5` is more likely a
-typo than an intent.
+There is one exception, `allow` in `models.json`, which narrows instead of
+widening. The next section says why.
 
-Claude Code honors `availableModels` from a user-level settings file, which
-is where a set puts it: a `--model` outside the list is replaced at start
-and `/model` refuses the switch. `enforceAvailableModels: true` in the same
-file makes the default model obey the list too. Both are verified below.
+## Model policy
+
+Decided on 2026-09-29, built in v3. Until v3 ships, the code has the older
+rule: `availableModels` in `claude.json` and `enabled_providers` in
+`opencode.json` narrow across layers by exact string.
+
+### The problem
+
+An employer policy bans models from Chinese companies. Some private
+projects should use only models served on the home network. Both are
+rules about groups of models, and a model list per layer, named one model
+at a time, does not say either one. And both are enforcement: a model that
+nobody has classified must not slip through.
+
+So models get **tags**, and layers allow or deny tags. Enforcement holds
+when the tool is launched through `mi6`, which is the bar the employer
+policy needs. `mi6 --bare` and a bare tool bypass it. The audit log records
+the first.
+
+### `models.json`
+
+```json
+{
+  "tags": {
+    "chinese": "Developed by a company based in China",
+    "network": "Served from hardware on the home network",
+    "cloud": "Served by a third-party API",
+    "anthropic": "Made by Anthropic"
+  },
+  "providers": {
+    "anthropic": { "tags": ["cloud"] },
+    "lmstudio": { "tags": ["network"] }
+  },
+  "models": {
+    "anthropic/claude-sonnet-5": { "tags": ["anthropic"], "claude": "sonnet" },
+    "lmstudio/qwen3-coder-30b": { "tags": ["chinese"] },
+    "lmstudio/gpt-oss-120b": { "tags": [] }
+  },
+  "deny": ["chinese"]
+}
+```
+
+A tag appears in three places, each with its own job:
+
+- **`tags` defines it**, with one line saying what it means. A tag used
+  anywhere else but defined nowhere in the stack is an error, because a
+  deny on a misspelled tag would deny nothing.
+- **`providers` and `models` attach it.** A model key is `provider/model`,
+  which is also OpenCode's name for it, and the provider must have an entry.
+  A model's tags are its own plus its provider's, so the same weights served
+  locally and from a cloud API are two entries with different tags. The
+  `claude` key is Claude Code's name for the model. A model without one is
+  not offered to Claude Code.
+- **`allow` and `deny` use it.** Each is a list of tags. Rules name tags
+  only, never a model. A tag with one model in it names one model.
+
+The catalog, meaning the definitions and the attached tags, normally lives
+in `~/.mi6/models.json`. A rule lives in the layer where the restriction
+should start. A private project's layer holds `{"allow": ["network"]}` and
+nothing else.
+
+### How it merges
+
+`tags`, `providers`, `models`, and `deny` follow the ordinary rule. A tag
+list unions, so a layer can attach a tag and never remove one that a layer
+above attached. A deny at the top reaches every set and nothing below lifts
+it.
+
+`allow` is the exception. Under the union rule a nearer layer could only
+widen it, which is backwards. So each layer's `allow` is kept apart, and a
+model must pass every one of them. A nearer layer can only narrow.
+
+### Which models are allowed
+
+The policy applies when any layer in the stack has an `allow` or a `deny`.
+With no rule anywhere, `mi6` restricts nothing. For each tool:
+
+1. Start with the catalog models the tool can use: every model for
+   OpenCode, those with a `claude` name for Claude Code.
+2. Remove every model with a denied tag.
+3. For each layer with an `allow`, keep only the models with at least one of
+   its tags.
+
+What is left is the tool's allowed list. A model outside the catalog is
+never allowed. Tagging a new model is a chore that comes with failing closed.
+
+### When a launch is refused
+
+Each refusal names the file and layer at fault.
+
+| Problem | Refuses |
+|---|---|
+| A tag is used but never defined | every tool |
+| A model's provider has no `providers` entry | every tool |
+| A hand-written `availableModels`, `enabled_providers`, `whitelist`, or `blacklist` | that tool |
+| The allowed list is empty | that tool |
+| A model the tool's settings name is not allowed | that tool |
+| A layer sets a variable that redirects the tool's model | that tool |
+| The tool has no way to enforce a model list | that tool |
+| The audit log cannot be written | every tool |
+
+A private project that leaves Claude Code no model still lets
+`mi6 opencode` start there. The message lists the rules in force and each
+catalog model with the reason it was removed:
+
+```
+mi6: not starting claude: no model is allowed here
+  deny   chinese   from ~/.mi6
+  allow  network   from ~/Documents/git/personal/secret-proj/.mi6
+  claude models in the catalog:
+    anthropic/claude-sonnet-5   tags: anthropic, cloud   removed: not in allow (secret-proj)
+```
+
+The model lists belong to `models.json` alone, so a hand-written list in a
+tool's settings is an error rather than a second place to look.
+
+### How each tool enforces it
+
+The tool does the enforcing. `mi6` writes the allowed list into the tool's
+settings in the set.
+
+**Claude Code.** `availableModels` gets the `claude` names of the allowed
+models, and `enforceAvailableModels` is `true`. A `--model` outside the list
+is replaced at start, `/model` refuses the switch, and the default model
+obeys the list. All three are verified below. `model` in the merged settings
+must be allowed.
+
+Variables can point Claude Code's model names somewhere else:
+`ANTHROPIC_MODEL`, `ANTHROPIC_DEFAULT_OPUS_MODEL`,
+`ANTHROPIC_DEFAULT_SONNET_MODEL`, `ANTHROPIC_DEFAULT_HAIKU_MODEL`,
+`ANTHROPIC_SMALL_FAST_MODEL`, `CLAUDE_CODE_SUBAGENT_MODEL`, and
+`ANTHROPIC_BASE_URL`. Under a policy a layer that sets one, in `env.json` or
+in the `env` key of `claude.json`, is refused, and `mi6` removes them from
+the environment it passes on, so one exported in your shell does not reach
+the tool either.
+
+**OpenCode.** `enabled_providers` gets the providers with an allowed model,
+which also shuts out any provider defined in `~/.config/opencode`.
+`provider.<id>.whitelist` gets each provider's allowed models. `model`,
+`small_model`, and every `agent.*.model` in the merged settings must be
+allowed. How far OpenCode enforces these is not verified yet; v3 checks it
+first.
+
+**A third tool** declares how it enforces a model list. Under a policy, a
+tool that cannot is refused.
+
+### The audit log
+
+Every launch appends one line to `$XDG_STATE_HOME/mi6/audit.jsonl`, with or
+without a policy, whether it starts, is refused, or is `--bare`. If the line
+cannot be written the launch is refused.
+
+```json
+{"time": "2026-09-29T14:02:11-04:00", "mi6": "0.4.0", "tool": "opencode",
+ "dir": "/Users/you/Documents/git/work/clients/globex/pipeline",
+ "set": "~/.local/state/mi6/sets/0851a02eab9b",
+ "layers": ["~/.mi6", "~/Documents/git/.mi6"],
+ "policy": "sha256:3f9a…",
+ "deny": [{"tag": "chinese", "from": "~/.mi6"}], "allow": [],
+ "allowed": ["anthropic/claude-sonnet-5", "lmstudio/gpt-oss-120b"],
+ "removed": [{"model": "lmstudio/qwen3-coder-30b", "why": "deny chinese (~/.mi6)"}],
+ "default": "anthropic/claude-sonnet-5", "outcome": "started"}
+```
+
+`policy` is a hash of the merged `models.json`, so two launches can be shown
+to run under the same rules without copying the catalog into every line.
+The log says what was allowed. What was used is in the tools' own history:
+Claude Code's transcripts in the set, OpenCode's sessions by directory. `set`
+and `dir` join the two.
+
+### Commands
+
+`mi6 resolve` prints the rules in force, each tool's allowed list, and each
+removed model with its reason. `mi6 doctor` reports every refusal above, and
+warns about a redirecting variable in the current shell and about model or
+provider keys in `~/.config/opencode`.
+
+The catalog has its own commands. Rules do not: a policy change is a
+hand-edit, so it is deliberate and shows in a diff.
+
+| Command | Does |
+|---|---|
+| `mi6 models` | The catalog, each model's tags, and whether it is allowed here and why |
+| `mi6 models discover` | Models the providers serve that the catalog lacks |
+| `mi6 models add <provider/model> [--tag t…] [--claude name]` | Add a model |
+| `mi6 models export [file]` | The merged catalog as one file: definitions and attached tags, no rules |
+| `mi6 models import <file>` | Merge a catalog file in. Adds only; a conflict is reported |
+| `mi6 tags` | The defined tags, their meaning, their layer, and how many models carry each |
+| `mi6 tags add <tag> "<meaning>"` | Define a tag |
+| `mi6 tag <model> <tag>…` | Attach tags |
+| `mi6 untag <model> <tag>…` | Remove tags, from the layer that attached them only |
+
+A command that writes edits `~/.mi6/models.json` unless `--layer <dir>`
+names another layer, since a tag is a fact about a model, not about the
+folder you are standing in. It rewrites the file with sorted keys.
+
+`discover` asks each OpenAI-compatible provider in the merged
+`opencode.json` for its `/v1/models`, and runs `opencode models`. Claude
+Code has no command that lists its models, so those are added by hand.
 
 ## How `mi6` finds the stack
 
@@ -239,7 +427,8 @@ came from, the set's location, and the merged variables. It builds the set
 too, so a setup script can call it.
 
 `mi6 --bare <tool>` skips the stack and starts the tool with its plain user
-config. Use it to repair a broken layer from inside the tool.
+config. Use it to repair a broken layer from inside the tool. It skips the
+model policy too, and the audit log records that it did.
 
 `mi6 doctor` checks that a launch from the current directory would work:
 git and each tool on the path with their versions, the state directory
@@ -247,8 +436,9 @@ writable, every layer in the stack parses, no skill collisions, and whether
 this shell is already inside a tool that `mi6` started. It exits non-zero
 on a failure, so a setup script can gate on it. Warnings do not fail it.
 
-`init`, `resolve`, `doctor`, `help`, and `version` are reserved names. Any
-other first argument is a tool.
+`init`, `resolve`, `doctor`, `models`, `tags`, `tag`, `untag`, `help`, and
+`version` are reserved names. Any other first argument is a tool. The model
+commands are under [Model policy](#model-policy).
 
 ## What happens without `mi6`
 
@@ -294,6 +484,10 @@ sketch, so it can come back without re-deciding it.
   feature, designed on its own, not a pattern the user assembles.
 - **Skill sources.** A layer that names a git repo, cloned and pulled by
   `mi6`. A symlink under `skills/` to a checkout you already have covers it.
+- **A model gateway.** Under a policy, `ANTHROPIC_BASE_URL` is refused,
+  since it can serve any model under the name `sonnet`. A layer that sets it
+  could instead name the provider it points at, so that provider's tags
+  apply. Wait until a gateway is in use.
 - **Accounts.** Each set has its own Claude Code login. That is verified:
   a fresh config directory starts logged out, and on macOS the login is a
   Keychain item keyed to the config directory, not a file in it. So there

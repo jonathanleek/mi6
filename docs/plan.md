@@ -128,6 +128,73 @@ The tap repo, its token, and the first tag are on hold.
 - **Plugins.** Nobody has asked.
 - **A third tool.** When someone runs one.
 
+## v3: model policy
+
+Decided on 2026-09-29. [Model policy](design.md#model-policy) is the spec.
+Eight milestones, in this order. 10 is first because if OpenCode does not
+enforce its lists, 12 changes shape.
+
+- Tags on models and providers, allow and deny by tag, in `models.json`.
+- Enforced when launched through `mi6`. Fail closed: an uncataloged model is
+  never allowed, and an empty allowed list refuses the launch.
+- Hand-written model lists in a tool's settings become an error.
+- An audit log of every launch, always on.
+
+### 10. Verify OpenCode
+
+- Install OpenCode with `brew install opencode`.
+- With `enabled_providers` and `provider.<id>.whitelist` in a set, check
+  whether OpenCode refuses a model outside them through `--model`, `/model`,
+  `small_model`, and an agent's `model`.
+- Check which wins when `~/.config/opencode` also sets `enabled_providers`.
+- Check whether Claude Code's background Haiku calls obey `availableModels`.
+- Extend `scripts/verify-models.sh`, and write the findings into the
+  design's verified list.
+
+### 11. Policy engine
+
+- A `models` package: load and merge `models.json`, compute each tool's
+  allowed list with the reason each other model was removed, and report
+  every refusal in the design's table. Table tests.
+- `layer` loads `models.json`. `mi6 init` scaffolds an empty one.
+
+### 12. Enforcement
+
+- A tool declares how it enforces a model list. Claude Code writes
+  `availableModels` and `enforceAvailableModels`. OpenCode writes
+  `enabled_providers` and each provider's `whitelist`.
+- Launch refuses on any refusal from 11, checks every model a tool's
+  settings name, and removes the redirecting variables from the environment.
+- Remove the v2 narrowing rule from `merge`.
+- Convert the example tree and the golden test.
+
+### 13. Audit and reporting
+
+- `audit.jsonl`: one line per launch, started, refused, or bare. A launch
+  that cannot write it is refused.
+- The models section in `mi6 resolve`. The new checks in `mi6 doctor`.
+
+### 14. Catalog commands
+
+- `mi6 models`, `models add`, `models export`, `models import`, `tags`,
+  `tags add`, `tag`, `untag`. Writes default to `~/.mi6/models.json`,
+  `--layer` names another.
+
+### 15. `mi6 models discover`
+
+- `/v1/models` from each OpenAI-compatible provider in the merged
+  `opencode.json`, and `opencode models`. Lists what the catalog lacks.
+
+### 16. Docs
+
+- The README's layer table and merge paragraph. `docs/verify.md`.
+
+### 17. Tagging skill
+
+- Not in this repo. A skill in `~/.mi6/skills/` that runs `discover`,
+  researches each new model's maker and origin from real sources, proposes
+  tags, waits for approval, and runs `mi6 tag`.
+
 ## README: compare with other tools
 
 Done in milestone 9. The comparison lives in the README.
