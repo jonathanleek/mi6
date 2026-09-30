@@ -11,9 +11,11 @@ import (
 
 	"github.com/jonathanleek/mi6/internal/build"
 	"github.com/jonathanleek/mi6/internal/doctor"
+	"github.com/jonathanleek/mi6/internal/enforce"
 	"github.com/jonathanleek/mi6/internal/launch"
 	"github.com/jonathanleek/mi6/internal/resolve"
 	"github.com/jonathanleek/mi6/internal/scaffold"
+	"github.com/jonathanleek/mi6/internal/tool"
 )
 
 // version is set by the release build with -ldflags "-X main.version=...".
@@ -25,6 +27,8 @@ const usage = `usage:
   mi6 init [dir]           create a .mi6 layer in a directory, with every file mi6 reads
   mi6 resolve [dir]        print the stack for a directory and build its set
   mi6 doctor [dir]         check that a launch from a directory would work
+  mi6 models ...           the model catalog; mi6 models help for the commands
+  mi6 tags ...             the model tags
   mi6 help
   mi6 version
 `
@@ -51,6 +55,18 @@ func run(args []string) int {
 		return runDoctor(args[1:])
 	case "init":
 		return runInit(args[1:])
+	case "models":
+		if len(args) > 1 && args[1] == "help" {
+			fmt.Print(catalogUsage)
+			return 0
+		}
+		return runModels(args[1:])
+	case "tags":
+		return runTags(args[1:])
+	case "tag":
+		return runTag(args[1:], false)
+	case "untag":
+		return runTag(args[1:], true)
 	case "--bare":
 		if len(args) < 2 {
 			fmt.Fprint(os.Stderr, usage)
@@ -69,7 +85,7 @@ func run(args []string) int {
 // runLaunch returns only on failure: a successful launch replaces the
 // process.
 func runLaunch(name string, args []string, bare bool) int {
-	err := launch.Run(name, args, launch.Options{Bare: bare})
+	err := launch.Run(name, args, launch.Options{Bare: bare, Version: version})
 	fmt.Fprintln(os.Stderr, "mi6:", err)
 	return 2
 }
@@ -156,7 +172,31 @@ func runResolve(args []string) int {
 		return 1
 	}
 	printBuild(r, home)
+	if printRefusals(st, r, home) {
+		return 1
+	}
 	return 0
+}
+
+// printRefusals prints what the model policy would refuse for each tool,
+// and reports whether there was anything.
+func printRefusals(st *resolve.Stack, r *build.Result, home string) bool {
+	refused := false
+	for _, t := range tool.All() {
+		refusals := enforce.Check(enforce.Input{
+			Tool: t, Layers: r.Layers, Merged: r.Merged, Dir: st.Dir, Checkout: st.Checkout,
+			Display: func(p string) string { return resolve.DisplayPath(p, home) },
+		})
+		if len(refusals) == 0 {
+			continue
+		}
+		refused = true
+		fmt.Printf("\nrefused    %s\n", t.Name())
+		for _, reason := range refusals {
+			fmt.Printf("  %s\n", strings.ReplaceAll(reason, "\n", "\n  "))
+		}
+	}
+	return refused
 }
 
 func printBuild(r *build.Result, home string) {
@@ -193,6 +233,43 @@ func printBuild(r *build.Result, home string) {
 	}
 	for _, w := range r.Merged.Warnings {
 		fmt.Printf("warning  %s\n", w)
+	}
+	printModels(r)
+}
+
+// printModels prints the model policy: the rules in force and, for each
+// tool, what is allowed and what was removed and why.
+func printModels(r *build.Result) {
+	p := r.Merged.Policy
+	if p == nil || (len(p.Models) == 0 && !p.Active()) {
+		return
+	}
+	fmt.Println()
+	if !p.Active() {
+		fmt.Printf("models     %d in the catalog, no rule applies here\n", len(p.Models))
+		return
+	}
+	fmt.Printf("models     policy %s\n", p.Hash())
+	for _, d := range p.Deny {
+		fmt.Printf("  deny   %-10s %s\n", d.Tag, d.From)
+	}
+	for _, a := range p.Allows {
+		fmt.Printf("  allow  %-10s %s\n", strings.Join(a.Tags, ","), a.From)
+	}
+	for _, t := range tool.All() {
+		e, ok := t.(tool.Enforcer)
+		if !ok {
+			fmt.Printf("  %-9s cannot enforce a model list\n", t.Name())
+			continue
+		}
+		res := p.Evaluate(t.Name(), e.ID())
+		fmt.Printf("  %-9s allowed  %s\n", t.Name(), strings.Join(res.IDs(), ", "))
+		for _, x := range res.Removed {
+			fmt.Printf("  %-9s removed  %-32s %s\n", "", x.Key, x.Why)
+		}
+		if d := enforce.Default(r.Merged.Settings(t.Name())); d != "" {
+			fmt.Printf("  %-9s default  %s\n", "", d)
+		}
 	}
 }
 

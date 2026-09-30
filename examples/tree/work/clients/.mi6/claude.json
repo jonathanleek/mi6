@@ -1,6 +1,4 @@
 {
-	"availableModels": ["sonnet", "haiku"],
-	"enforceAvailableModels": true,
 	"permissions": {
 		"deny": ["Bash(git push *)"]
 	}

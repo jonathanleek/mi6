@@ -20,7 +20,9 @@ import (
 // Result says what Build did.
 type Result struct {
 	// Dir is the set's directory. Each tool has a subdirectory named after it.
-	Dir     string
+	Dir string
+	// Layers are the stack's layers as loaded, in order.
+	Layers  []*layer.Layer
 	Merged  *merge.Merged
 	Changes map[string][]set.Change
 	// Env is the merged env.json with a leading ~ in each value expanded to
@@ -100,7 +102,7 @@ func Build(st *resolve.Stack, opts Options) (*Result, error) {
 	display := func(p string) string { return resolve.DisplayPath(p, home) }
 	m := merge.Stack(layers, display)
 
-	r := &Result{Dir: SetDir(stateDir, st), Merged: m, Changes: map[string][]set.Change{}}
+	r := &Result{Dir: SetDir(stateDir, st), Layers: layers, Merged: m, Changes: map[string][]set.Change{}}
 	for _, name := range m.EnvNames() {
 		r.Env = append(r.Env, name+"="+expandHome(m.Env[name], home))
 	}

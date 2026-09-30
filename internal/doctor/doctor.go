@@ -11,7 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jonathanleek/mi6/internal/audit"
 	"github.com/jonathanleek/mi6/internal/build"
+	"github.com/jonathanleek/mi6/internal/enforce"
 	"github.com/jonathanleek/mi6/internal/launch"
 	"github.com/jonathanleek/mi6/internal/layer"
 	"github.com/jonathanleek/mi6/internal/merge"
@@ -140,6 +142,60 @@ func Run(opts Options) (*Report, error) {
 		add(Warn, "skills", w)
 	}
 
+	// The model policy: what it would refuse, and what is outside its reach.
+	if p := m.Policy; p != nil {
+		for _, e := range p.Errors {
+			add(Fail, "models", e)
+		}
+		refused := len(p.Errors) > 0
+		var summary []string
+		for _, t := range tool.All() {
+			refusals := enforce.Check(enforce.Input{Tool: t, Layers: layers, Merged: m, Dir: st.Dir, Checkout: st.Checkout, Display: show})
+			for _, r := range refusals {
+				if strings.HasPrefix(r, "models.json") && strings.Contains(strings.Join(p.Errors, "\n"), r) {
+					continue // reported above
+				}
+				refused = true
+				add(Fail, "models", fmt.Sprintf("%s: %s", t.Name(), strings.ReplaceAll(r, "\n", "\n      ")))
+			}
+			if e, ok := t.(tool.Enforcer); ok && p.Active() {
+				summary = append(summary, fmt.Sprintf("%s %d allowed", t.Name(), len(p.Evaluate(t.Name(), e.ID()).Allowed)))
+			}
+			for _, v := range enforceVars(t) {
+				if _, set := os.LookupEnv(v); set {
+					add(Warn, "env", fmt.Sprintf("%s is set in this shell; under a policy mi6 removes it at launch", v))
+				}
+			}
+			for _, w := range enforce.Outside(t, home, show) {
+				add(Warn, "outside", w)
+			}
+			if e, ok := t.(tool.Enforcer); ok {
+				for _, path := range e.ManagedPaths() {
+					if _, err := os.Stat(path); err == nil {
+						add(Warn, "managed", fmt.Sprintf("%s exists; %s reads it after the set, and mi6 cannot see what it does to models", path, t.Name()))
+					}
+				}
+			}
+		}
+		switch {
+		case refused:
+		case p.Active():
+			add(OK, "models", "policy in force: "+strings.Join(summary, ", "))
+		case len(p.Models) > 0:
+			add(OK, "models", fmt.Sprintf("%d models in the catalog, no rule applies here", len(p.Models)))
+		default:
+			add(OK, "models", "no models.json in the stack")
+		}
+	}
+
+	// The audit log.
+	logPath := audit.Path(stateDir)
+	if err := audit.Writable(logPath); err != nil {
+		add(Fail, "audit", fmt.Sprintf("%s is not writable, and a launch that cannot log is refused: %v", show(logPath), err))
+	} else {
+		add(OK, "audit", show(logPath)+" is writable")
+	}
+
 	// Already inside a session that mi6 started.
 	if t := os.Getenv(launch.ToolVar); t != "" {
 		add(Warn, "session", fmt.Sprintf("%s=%s is set: this shell is inside a tool that mi6 started, and mi6 %s here would start it as is", launch.ToolVar, t, t))
@@ -148,6 +204,14 @@ func Run(opts Options) (*Report, error) {
 	}
 
 	return r, nil
+}
+
+// enforceVars are the variables a tool says redirect its model, or none.
+func enforceVars(t tool.Tool) []string {
+	if e, ok := t.(tool.Enforcer); ok {
+		return e.Vars()
+	}
+	return nil
 }
 
 // version finds cmd on the PATH and returns its path and the first line of

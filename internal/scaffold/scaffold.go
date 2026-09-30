@@ -53,6 +53,7 @@ func Create(dir, home string) (*Result, error) {
 		{"claude.json", "{\n\t\"permissions\": {\n\t\t\"allow\": [],\n\t\t\"deny\": []\n\t}\n}\n"},
 		{"opencode.json", "{\n\t\"$schema\": \"https://opencode.ai/config.json\"\n}\n"},
 		{"env.json", "{}\n"},
+		{"models.json", "{\n\t\"tags\": {},\n\t\"providers\": {},\n\t\"models\": {}\n}\n"},
 		{filepath.Join("skills", "README.md"), skillsReadme},
 	}
 	for _, f := range files {
@@ -106,6 +107,7 @@ above it. Every file is optional. mi6 ignores this README.
 | claude.json | Claude Code settings, the same shape as settings.json. Lists union with the layers above. |
 | opencode.json | OpenCode settings. |
 | env.json | Variables to export to the tool, names to strings. |
+| models.json | Model tags, and allow and deny rules by tag. Define tags in one high layer; put a rule where the restriction should start. |
 
 Run mi6 resolve in any repo below to see the stack it gets.
 `, name)

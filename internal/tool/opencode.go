@@ -1,11 +1,15 @@
 package tool
 
 import (
+	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
+	"strings"
 
 	"github.com/jonathanleek/mi6/internal/layer"
 	"github.com/jonathanleek/mi6/internal/merge"
+	"github.com/jonathanleek/mi6/internal/models"
 	"github.com/jonathanleek/mi6/internal/set"
 )
 
@@ -30,13 +34,64 @@ func (OpenCode) Env(dir string) []string {
 	}
 }
 
-func (OpenCode) Plan(m *merge.Merged, dir string) (*set.Plan, error) {
+// Model enforcement, verified on 1.18.30 with scripts/verify-enforcement.sh.
+// enabled_providers and provider.<id>.whitelist in the set hold against -m,
+// the /model picker, agents, and the default, and win over the global and
+// the checkout's config because the set is read last of the files. The
+// checkout can still set what the set does not, such as a provider's
+// address, and OPENCODE_CONFIG_CONTENT is read after the set, so those are
+// refused.
+func (OpenCode) ID() models.ID { return models.KeyID }
+func (OpenCode) ListKeys() []string {
+	return []string{"enabled_providers", "disabled_providers", "provider.*.whitelist", "provider.*.blacklist"}
+}
+func (OpenCode) ModelKeys() []string {
+	return []string{"model", "small_model", "agent.*.model", "mode.*.model"}
+}
+func (OpenCode) Vars() []string { return []string{"OPENCODE_CONFIG_CONTENT"} }
+func (OpenCode) Args() []string { return nil }
+func (OpenCode) CheckoutFiles() []string {
+	return []string{"opencode.json", "opencode.jsonc", ".opencode/opencode.json", ".opencode/opencode.jsonc"}
+}
+func (OpenCode) CheckoutKeys() []string { return []string{"provider"} }
+
+// OpenCode keeps reading its global config under OPENCODE_CONFIG_DIR.
+func (OpenCode) OutsideFiles(home string) []string {
+	dir := filepath.Join(home, ".config")
+	if x := os.Getenv("XDG_CONFIG_HOME"); x != "" {
+		dir = x
+	}
+	return []string{filepath.Join(dir, "opencode", "opencode.json"), filepath.Join(dir, "opencode", "opencode.jsonc")}
+}
+
+// Paths from OpenCode's config/managed.ts at 1.18.30. The console account's
+// organization config is read after the set too, but it lives in
+// OpenCode's database, so it is not checked.
+func (OpenCode) ManagedPaths() []string {
+	switch runtime.GOOS {
+	case "darwin":
+		return []string{
+			"/Library/Application Support/opencode",
+			"/Library/Managed Preferences/ai.opencode.managed.plist",
+			filepath.Join("/Library/Managed Preferences", os.Getenv("USER"), "ai.opencode.managed.plist"),
+		}
+	case "windows":
+		return []string{filepath.Join(os.Getenv("ProgramData"), "opencode")}
+	default:
+		return []string{"/etc/opencode"}
+	}
+}
+
+func (o OpenCode) Plan(m *merge.Merged, dir string) (*set.Plan, error) {
 	cfg := layer.Object{}
 	for k, v := range m.OpenCode {
 		cfg[k] = v
 	}
 	if _, ok := cfg["$schema"]; !ok {
 		cfg["$schema"] = "https://opencode.ai/config.json"
+	}
+	if m.Policy != nil && m.Policy.Active() {
+		enforce(cfg, m.Policy.Evaluate(o.Name(), o.ID()))
 	}
 	if servers, ok := m.MCP["mcpServers"].(map[string]any); ok && len(servers) > 0 {
 		existing, _ := cfg["mcp"].(map[string]any)
@@ -97,4 +152,43 @@ func translateMCP(servers map[string]any) layer.Object {
 		out[name] = dst
 	}
 	return out
+}
+
+// enforce writes the allowed list into cfg: enabled_providers is the
+// providers with an allowed model, and each one's whitelist is its allowed
+// models. Providers are copied before they are changed, so the merged
+// settings stay as they were.
+func enforce(cfg layer.Object, r *models.Result) {
+	providers := layer.Object{}
+	for k, v := range object(cfg["provider"]) {
+		providers[k] = v
+	}
+	var enabled []string
+	byProvider := map[string][]string{}
+	for _, e := range r.Allowed {
+		prov, model, _ := strings.Cut(e.Key, "/")
+		if _, ok := byProvider[prov]; !ok {
+			enabled = append(enabled, prov)
+		}
+		byProvider[prov] = append(byProvider[prov], model)
+	}
+	sort.Strings(enabled)
+	for _, prov := range enabled {
+		entry := layer.Object{}
+		for k, v := range object(providers[prov]) {
+			entry[k] = v
+		}
+		entry["whitelist"] = byProvider[prov]
+		providers[prov] = entry
+	}
+	if enabled == nil {
+		enabled = []string{}
+	}
+	cfg["enabled_providers"] = enabled
+	cfg["provider"] = providers
+}
+
+func object(v any) map[string]any {
+	o, _ := v.(map[string]any)
+	return o
 }

@@ -10,6 +10,7 @@
 //	opencode.json             OpenCode settings
 //	env.json                  variables to export to the tool, a flat object
 //	                          of names to strings
+//	models.json               model tags and the rules that allow or deny them
 package layer
 
 import (
@@ -43,6 +44,8 @@ type Layer struct {
 	MCP      Object
 	Claude   Object
 	OpenCode Object
+	// Models is models.json, or nil. The models package reads it.
+	Models Object
 	// Env is env.json, or nil.
 	Env      map[string]string
 	Warnings []string
@@ -50,6 +53,17 @@ type Layer struct {
 
 // HasInstructions reports whether the layer has an AGENTS.md.
 func (l *Layer) HasInstructions() bool { return l.Instructions != "" }
+
+// Settings returns the layer's settings for the tool with that name, or nil.
+func (l *Layer) Settings(tool string) Object {
+	switch tool {
+	case "claude":
+		return l.Claude
+	case "opencode":
+		return l.OpenCode
+	}
+	return nil
+}
 
 // Load reads the layer at path. A missing file is not an error. A file that
 // exists but cannot be parsed is.
@@ -68,6 +82,7 @@ func Load(path string) (*Layer, error) {
 		"mcp.json":      &l.MCP,
 		"claude.json":   &l.Claude,
 		"opencode.json": &l.OpenCode,
+		"models.json":   &l.Models,
 	} {
 		obj, err := loadObject(filepath.Join(path, name))
 		if err != nil {

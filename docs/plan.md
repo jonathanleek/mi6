@@ -128,6 +128,81 @@ The tap repo, its token, and the first tag are on hold.
 - **Plugins.** Nobody has asked.
 - **A third tool.** When someone runs one.
 
+## v3: model policy
+
+Decided on 2026-09-29. [Model policy](design.md#model-policy) is the spec.
+Eight milestones, in this order. 10 is first because if OpenCode does not
+enforce its lists, 12 changes shape.
+
+- Tags on models and providers, allow and deny by tag, in `models.json`.
+- Enforced when launched through `mi6`. Fail closed: an uncataloged model is
+  never allowed, and an empty allowed list refuses the launch.
+- Hand-written model lists in a tool's settings become an error.
+- An audit log of every launch, always on.
+
+### 10. Verify OpenCode (done)
+
+Done on 2026-09-29 against fake servers, so no login was needed:
+`scripts/verify-enforcement.sh`. OpenCode enforces its lists everywhere
+the design needs, and so does Claude Code, including the background
+request of an interactive session. Five ways around the lists were found
+and the design now refuses each: the checkout's own tool settings in both
+tools, a trusted checkout's `ANTHROPIC_BASE_URL`, `OPENCODE_CONFIG_CONTENT`,
+and a passed-through `--settings`. Milestone 12 builds those refusals.
+
+### 11. Policy engine (done)
+
+- A `models` package: load and merge `models.json`, compute each tool's
+  allowed list with the reason each other model was removed, and report
+  the refusals that come from the catalog itself: an undefined tag, a
+  model without a provider entry, a file with the wrong shape. Table
+  tests. The refusals that need a tool's settings or the checkout are
+  milestone 12.
+- `layer` loads `models.json`. `mi6 init` scaffolds an empty one.
+
+### 12. Enforcement (done)
+
+- A tool declares how it enforces a model list. Claude Code writes
+  `availableModels` and `enforceAvailableModels`. OpenCode writes
+  `enabled_providers` and each provider's `whitelist`.
+- Launch refuses on any refusal from 11, checks every model a tool's
+  settings name, and removes the redirecting variables from the environment,
+  `OPENCODE_CONFIG_CONTENT` among them.
+- Launch reads the checkout's own tool settings, `.claude/settings.json`,
+  `.claude/settings.local.json`, and OpenCode's `opencode.json` and
+  `.opencode/opencode.json` up to the checkout root, and refuses if any
+  touches models. It refuses `--settings` and `--setting-sources` in the
+  arguments passed to Claude Code.
+- Remove the v2 narrowing rule from `merge`.
+- Convert the example tree and the golden test.
+
+### 13. Audit and reporting (done)
+
+- `audit.jsonl`: one line per launch, started, refused, or bare. A launch
+  that cannot write it is refused.
+- The models section in `mi6 resolve`. The new checks in `mi6 doctor`.
+
+### 14. Catalog commands (done)
+
+- `mi6 models`, `models add`, `models export`, `models import`, `tags`,
+  `tags add`, `tag`, `untag`. Writes default to `~/.mi6/models.json`,
+  `--layer` names another.
+
+### 15. `mi6 models discover` (done)
+
+- `/v1/models` from each OpenAI-compatible provider in the merged
+  `opencode.json`, and `opencode models`. Lists what the catalog lacks.
+
+### 16. Docs (done)
+
+- The README's layer table and merge paragraph. `docs/verify.md`.
+
+### 17. Tagging skill (done, outside the repo)
+
+- Not in this repo. A skill in `~/.mi6/skills/` that runs `discover`,
+  researches each new model's maker and origin from real sources, proposes
+  tags, waits for approval, and runs `mi6 tag`.
+
 ## README: compare with other tools
 
 Done in milestone 9. The comparison lives in the README.

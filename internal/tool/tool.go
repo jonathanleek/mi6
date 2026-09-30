@@ -1,6 +1,7 @@
 // Package tool knows, for each supported agent, the environment variable that
 // moves its config, the files it reads from that directory, where MCP
-// servers go, and how to start it. Adding a tool is one file here.
+// servers go, how to start it, and how it enforces a model list. Adding a
+// tool is one file here.
 package tool
 
 import (
@@ -8,6 +9,7 @@ import (
 	"sort"
 
 	"github.com/jonathanleek/mi6/internal/merge"
+	"github.com/jonathanleek/mi6/internal/models"
 	"github.com/jonathanleek/mi6/internal/set"
 )
 
@@ -21,6 +23,46 @@ type Tool interface {
 	Plan(m *merge.Merged, dir string) (*set.Plan, error)
 	// Env returns KEY=VALUE pairs that point the tool at dir.
 	Env(dir string) []string
+}
+
+// Enforcer is a tool that can enforce a model list. Under a policy a tool
+// that is not one is refused. Each method states a fact about the tool;
+// the enforce package applies them. A key is a path into the tool's
+// settings, with "." between levels and "*" for any name at a level.
+type Enforcer interface {
+	Tool
+	// ID says how the tool names a catalog model.
+	ID() models.ID
+	// ListKeys are the settings keys that hold a model list or switch its
+	// enforcement. The policy owns them: Plan writes them, and a layer or
+	// the checkout that sets one is refused.
+	ListKeys() []string
+	// ModelKeys are the settings keys that name one model. Each must be
+	// allowed.
+	ModelKeys() []string
+	// Vars are the variables that redirect the tool's model or replace its
+	// config. A layer that sets one is refused, and they are removed from
+	// the environment at launch.
+	Vars() []string
+	// Args are the passed-through arguments that replace or reselect the
+	// tool's settings. They are refused.
+	Args() []string
+	// CheckoutFiles are the checkout's own settings files, which outrank
+	// the set's. They are looked for in every directory from the working
+	// directory up to the checkout root. One that sets a ListKey, a
+	// ModelKey, env.<Var>, or a CheckoutKey is refused.
+	CheckoutFiles() []string
+	// CheckoutKeys are further keys refused in a checkout file, for what
+	// the set cannot pin, such as a provider's address.
+	CheckoutKeys() []string
+	// OutsideFiles are settings files outside the set that the tool still
+	// reads under it. The set's lists win over them, but doctor warns when
+	// one touches models. home is the user's home directory.
+	OutsideFiles(home string) []string
+	// ManagedPaths are where an administrator's config would be, which is
+	// read after the set and is out of mi6's reach. doctor reports one
+	// that exists.
+	ManagedPaths() []string
 }
 
 var registry = map[string]Tool{}
