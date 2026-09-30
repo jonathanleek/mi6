@@ -478,3 +478,82 @@ func TestInit(t *testing.T) {
 		t.Errorf("second init:\n%s", r.stdout)
 	}
 }
+
+func TestCatalogCommands(t *testing.T) {
+	home, state, project := fixture(t, true)
+	run := func(want int, args ...string) result {
+		t.Helper()
+		r := mi6(t, home, state, project, nil, args...)
+		if r.code != want {
+			t.Fatalf("%v: exit %d, want %d\nstdout %s\nstderr %s", args, r.code, want, r.stdout, r.stderr)
+		}
+		return r
+	}
+	// An undefined tag is refused before anything is written.
+	r := run(1, "tag", "lmstudio/qwen", "chinese")
+	if !strings.Contains(r.stderr, "not saved") || !strings.Contains(r.stderr, `tag "chinese"`) {
+		t.Errorf("stderr %s", r.stderr)
+	}
+	if _, err := os.Stat(filepath.Join(home, ".mi6", "models.json")); err == nil {
+		t.Error("a refused edit wrote the file")
+	}
+	run(0, "tags", "add", "chinese", "Made in China")
+	run(0, "tags", "add", "network", "On the LAN")
+	r = run(0, "models", "add", "lmstudio/qwen", "--tag", "chinese")
+	if !strings.Contains(r.stdout, "wrote ~/.mi6/models.json") || !strings.Contains(r.stdout, "provider lmstudio") {
+		t.Errorf("stdout %s", r.stdout)
+	}
+	run(0, "models", "add", "anthropic/claude-sonnet-5", "--claude", "sonnet")
+	run(0, "tag", "lmstudio", "network")
+	r = run(1, "models", "add", "x/y", "--aider", "z")
+	if !strings.Contains(r.stderr, "--aider is not a tool") {
+		t.Errorf("stderr %s", r.stderr)
+	}
+	// The tree layer denies chinese; writes still go to ~/.mi6 by default.
+	writeLayer(t, filepath.Join(home, "git", ".mi6"), "models.json", `{"deny": ["chinese"]}`)
+	r = run(0, "models")
+	for _, want := range []string{"deny   chinese    ~/git/.mi6", "lmstudio/qwen                    chinese, network", "opencode  removed: deny chinese (~/git/.mi6)", "claude    allowed as sonnet"} {
+		if !strings.Contains(r.stdout, want) {
+			t.Errorf("models lacks %q:\n%s", want, r.stdout)
+		}
+	}
+	r = run(0, "tags")
+	if !strings.Contains(r.stdout, "chinese      1       ~/.mi6") || !strings.Contains(r.stdout, "network      1") {
+		t.Errorf("tags:\n%s", r.stdout)
+	}
+	r = run(1, "untag", "lmstudio/qwen", "chinese", "--layer", filepath.Join(home, "git"))
+	if !strings.Contains(r.stderr, "~/git/.mi6/models.json") {
+		t.Errorf("untag from the wrong layer: %s", r.stderr)
+	}
+	run(0, "untag", "lmstudio/qwen", "chinese")
+	r = run(0, "models")
+	if strings.Contains(r.stdout, "removed: deny") {
+		t.Errorf("untag did not take:\n%s", r.stdout)
+	}
+
+	// Export carries no rule; import into the tree layer adds only what is new.
+	export := filepath.Join(home, "catalog.json")
+	run(0, "models", "export", export)
+	b, _ := os.ReadFile(export)
+	if strings.Contains(string(b), "deny") || !strings.Contains(string(b), `"network": "On the LAN"`) {
+		t.Errorf("export:\n%s", b)
+	}
+	other := filepath.Join(home, "other.json")
+	os.WriteFile(other, []byte(`{"tags": {"network": "Nearby", "fast": "Quick"}, "models": {"ollama/llama": {"tags": ["fast"]}}, "deny": ["fast"]}`), 0o644)
+	r = run(1, "models", "import", other, "--layer", filepath.Join(home, "git"))
+	if !strings.Contains(r.stdout, `conflict  tag network means "On the LAN" in ~/.mi6`) || !strings.Contains(r.stdout, "wrote ~/git/.mi6/models.json") || !strings.Contains(r.stdout, "deny was ignored") {
+		t.Errorf("import:\n%s", r.stdout)
+	}
+	b, _ = os.ReadFile(filepath.Join(home, "git", ".mi6", "models.json"))
+	if !strings.Contains(string(b), `"fast": "Quick"`) || strings.Contains(string(b), "Nearby") || !strings.Contains(string(b), "ollama/llama") || !strings.Contains(string(b), `"chinese"`) {
+		t.Errorf("tree layer after import:\n%s", b)
+	}
+	r = run(0, "models", "export")
+	if !strings.Contains(r.stdout, "ollama/llama") {
+		t.Errorf("export to stdout:\n%s", r.stdout)
+	}
+	r = run(0, "models", "help")
+	if !strings.Contains(r.stdout, "mi6 tags add") {
+		t.Errorf("help:\n%s", r.stdout)
+	}
+}

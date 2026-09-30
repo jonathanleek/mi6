@@ -182,7 +182,7 @@ and a passed-through `--settings`. Milestone 12 builds those refusals.
   that cannot write it is refused.
 - The models section in `mi6 resolve`. The new checks in `mi6 doctor`.
 
-### 14. Catalog commands
+### 14. Catalog commands (done)
 
 - `mi6 models`, `models add`, `models export`, `models import`, `tags`,
   `tags add`, `tag`, `untag`. Writes default to `~/.mi6/models.json`,

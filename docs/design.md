@@ -332,17 +332,19 @@ hand-edit, so it is deliberate and shows in a diff.
 |---|---|
 | `mi6 models` | The catalog, each model's tags, and whether it is allowed here and why |
 | `mi6 models discover` | Models the providers serve that the catalog lacks |
-| `mi6 models add <provider/model> [--tag t…] [--claude name]` | Add a model |
+| `mi6 models add <provider/model> [--tag t…] [--<tool> name…]` | Add a model, with the name each tool uses for it |
 | `mi6 models export [file]` | The merged catalog as one file: definitions and attached tags, no rules |
-| `mi6 models import <file>` | Merge a catalog file in. Adds only; a conflict is reported |
+| `mi6 models import <file>` | Add what the stack lacks from a catalog file. A meaning or tool name that differs is a conflict, reported and not imported |
 | `mi6 tags` | The defined tags, their meaning, their layer, and how many models carry each |
 | `mi6 tags add <tag> "<meaning>"` | Define a tag |
-| `mi6 tag <model> <tag>…` | Attach tags |
-| `mi6 untag <model> <tag>…` | Remove tags, from the layer that attached them only |
+| `mi6 tag <model\|provider> <tag>…` | Attach tags |
+| `mi6 untag <model\|provider> <tag>…` | Remove tags, from the layer that attached them only |
 
 A command that writes edits `~/.mi6/models.json` unless `--layer <dir>`
 names another layer, since a tag is a fact about a model, not about the
-folder you are standing in. It rewrites the file with sorted keys.
+folder you are standing in. It checks the result against the stack first,
+so an undefined tag is refused with the reason and nothing is written,
+and it rewrites the file with sorted keys.
 
 `discover` asks each OpenAI-compatible provider in the merged
 `opencode.json` for its `/v1/models`, and runs `opencode models`. Claude

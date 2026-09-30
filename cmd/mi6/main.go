@@ -27,6 +27,8 @@ const usage = `usage:
   mi6 init [dir]           create a .mi6 layer in a directory, with every file mi6 reads
   mi6 resolve [dir]        print the stack for a directory and build its set
   mi6 doctor [dir]         check that a launch from a directory would work
+  mi6 models ...           the model catalog; mi6 models help for the commands
+  mi6 tags ...             the model tags
   mi6 help
   mi6 version
 `
@@ -53,6 +55,18 @@ func run(args []string) int {
 		return runDoctor(args[1:])
 	case "init":
 		return runInit(args[1:])
+	case "models":
+		if len(args) > 1 && args[1] == "help" {
+			fmt.Print(catalogUsage)
+			return 0
+		}
+		return runModels(args[1:])
+	case "tags":
+		return runTags(args[1:])
+	case "tag":
+		return runTag(args[1:], false)
+	case "untag":
+		return runTag(args[1:], true)
 	case "--bare":
 		if len(args) < 2 {
 			fmt.Fprint(os.Stderr, usage)
