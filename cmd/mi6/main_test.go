@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -555,5 +557,27 @@ func TestCatalogCommands(t *testing.T) {
 	r = run(0, "models", "help")
 	if !strings.Contains(r.stdout, "mi6 tags add") {
 		t.Errorf("help:\n%s", r.stdout)
+	}
+}
+
+func TestModelsDiscover(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"data": [{"id": "qwen3-coder-30b"}, {"id": "gpt-oss-120b"}]}`))
+	}))
+	defer srv.Close()
+	home, state, project := fixture(t, true)
+	writeLayer(t, filepath.Join(home, ".mi6"), "opencode.json", `{"provider": {"lmstudio": {"options": {"baseURL": "`+srv.URL+`/v1"}}, "down": {"options": {"baseURL": "http://127.0.0.1:1/v1"}}}}`)
+	writeLayer(t, filepath.Join(home, ".mi6"), "models.json", `{"providers": {"lmstudio": {}, "anthropic": {}}, "models": {"lmstudio/qwen3-coder-30b": {}, "anthropic/claude-sonnet-5": {"claude": "sonnet"}}}`)
+	r := mi6(t, home, state, project, []string{"OPENCODE_CONFIG_DIR=/should-not-reach-the-command"}, "models", "discover")
+	if r.code != 0 {
+		t.Fatalf("exit %d\n%s%s", r.code, r.stdout, r.stderr)
+	}
+	for _, want := range []string{"note  down: unreachable", "4 models served, 2 not in the catalog:", "anthropic/claude-opus-5                  opencode models", "lmstudio/gpt-oss-120b                    " + srv.URL + "/v1", "add one with: mi6 models add"} {
+		if !strings.Contains(r.stdout, want) {
+			t.Errorf("lacks %q:\n%s", want, r.stdout)
+		}
+	}
+	if strings.Contains(r.stdout, "SET-LEAKED") || strings.Contains(r.stdout, "qwen3-coder-30b") {
+		t.Errorf("stdout:\n%s", r.stdout)
 	}
 }

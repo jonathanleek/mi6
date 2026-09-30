@@ -1,5 +1,13 @@
 #!/bin/sh
 # Fake opencode for tests: print what a launcher handed us, then exit.
+# "opencode models" lists two models instead, and shows whether the set's
+# variables reached it.
+if [ "$1" = models ]; then
+	echo "anthropic/claude-sonnet-5"
+	echo "anthropic/claude-opus-5"
+	[ -n "$OPENCODE_CONFIG_DIR" ] && echo "SET-LEAKED"
+	exit 0
+fi
 echo "TOOL=opencode"
 echo "PWD=$(pwd)"
 echo "ARGS=$*"

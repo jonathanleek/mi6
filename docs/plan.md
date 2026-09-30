@@ -188,7 +188,7 @@ and a passed-through `--settings`. Milestone 12 builds those refusals.
   `tags add`, `tag`, `untag`. Writes default to `~/.mi6/models.json`,
   `--layer` names another.
 
-### 15. `mi6 models discover`
+### 15. `mi6 models discover` (done)
 
 - `/v1/models` from each OpenAI-compatible provider in the merged
   `opencode.json`, and `opencode models`. Lists what the catalog lacks.

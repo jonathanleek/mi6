@@ -346,9 +346,13 @@ folder you are standing in. It checks the result against the stack first,
 so an undefined tag is refused with the reason and nothing is written,
 and it rewrites the file with sorted keys.
 
-`discover` asks each OpenAI-compatible provider in the merged
-`opencode.json` for its `/v1/models`, and runs `opencode models`. Claude
-Code has no command that lists its models, so those are added by hand.
+`discover` asks each provider in the merged `opencode.json` that has a
+`baseURL` for its `/models`, and runs `opencode models` with the tool's
+plain config, since under the set that command would list only what the
+policy allows. The second shows what OpenCode knows from its own logins
+and its built-in providers, which include free models that need no login
+at all; the policy shuts those out until they are cataloged. Claude Code
+has no command that lists its models, so those are added by hand.
 
 ## How `mi6` finds the stack
 

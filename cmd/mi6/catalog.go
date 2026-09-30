@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/jonathanleek/mi6/internal/catalog"
+	"github.com/jonathanleek/mi6/internal/discover"
 	"github.com/jonathanleek/mi6/internal/layer"
 	"github.com/jonathanleek/mi6/internal/merge"
 	"github.com/jonathanleek/mi6/internal/models"
@@ -16,6 +17,7 @@ import (
 
 const catalogUsage = `usage:
   mi6 models                                     the catalog, and what is allowed here
+  mi6 models discover                            models the providers serve that the catalog lacks
   mi6 models add <provider/model> [--tag t]... [--<tool> name]...
   mi6 models export [file]                       the merged catalog as one file, no rules
   mi6 models import <file>                       merge a catalog file in; adds only
@@ -122,6 +124,8 @@ func runModels(args []string) int {
 	switch args[0] {
 	case "add":
 		return addModel(args[1:])
+	case "discover":
+		return discoverModels(args[1:])
 	case "export":
 		return exportModels(args[1:])
 	case "import":
@@ -209,6 +213,37 @@ func printErrors(p *models.Policy) int {
 	if len(p.Errors) > 0 {
 		return 1
 	}
+	return 0
+}
+
+// discoverModels asks the providers what they serve and prints what the
+// catalog lacks, with the source of each, so a tagging pass has a list.
+func discoverModels(args []string) int {
+	if len(args) > 0 {
+		fmt.Fprint(os.Stderr, "usage: mi6 models discover\n")
+		return 2
+	}
+	s, err := loadStack()
+	if err != nil {
+		return fail(err)
+	}
+	r := discover.Run(s.merged, discover.Options{})
+	for _, n := range r.Notes {
+		fmt.Printf("note  %s\n", n)
+	}
+	if len(r.Found) == 0 {
+		fmt.Println("no models found. A provider in a layer's opencode.json is asked at its baseURL; opencode models lists the rest.")
+		return 0
+	}
+	if len(r.Missing) == 0 {
+		fmt.Printf("%d models served, all in the catalog\n", len(r.Found))
+		return 0
+	}
+	fmt.Printf("%d models served, %d not in the catalog:\n", len(r.Found), len(r.Missing))
+	for _, f := range r.Missing {
+		fmt.Printf("  %-40s %s\n", f.Key, f.Source)
+	}
+	fmt.Println("add one with: mi6 models add <provider/model> --tag <tag>")
 	return 0
 }
 
