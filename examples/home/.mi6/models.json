@@ -1,0 +1,20 @@
+{
+	"tags": {
+		"anthropic": "Made by Anthropic",
+		"chinese": "Developed by a company based in China",
+		"cloud": "Served by a third-party API",
+		"frontier": "The largest and most expensive tier",
+		"network": "Served from hardware on the home network"
+	},
+	"providers": {
+		"anthropic": {"tags": ["cloud"]},
+		"lmstudio": {"tags": ["network"]}
+	},
+	"models": {
+		"anthropic/claude-opus-5": {"tags": ["anthropic", "frontier"], "claude": "opus"},
+		"anthropic/claude-sonnet-5": {"tags": ["anthropic"], "claude": "sonnet"},
+		"anthropic/claude-haiku-5": {"tags": ["anthropic"], "claude": "haiku"},
+		"lmstudio/gpt-oss-120b": {"tags": []},
+		"lmstudio/qwen3-coder-30b": {"tags": ["chinese"]}
+	}
+}

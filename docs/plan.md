@@ -160,7 +160,7 @@ and a passed-through `--settings`. Milestone 12 builds those refusals.
   milestone 12.
 - `layer` loads `models.json`. `mi6 init` scaffolds an empty one.
 
-### 12. Enforcement
+### 12. Enforcement (done)
 
 - A tool declares how it enforces a model list. Claude Code writes
   `availableModels` and `enforceAvailableModels`. OpenCode writes

@@ -581,7 +581,8 @@ Checked on 2026-09-23 and 2026-09-24 with Claude Code 2.1.281 and OpenCode
 - `availableModels` in a set's `settings.json` is enforced, on 2026-09-24:
   with `["sonnet"]` and `enforceAvailableModels: true` in a layer,
   `claude --model opus -p` answered as Sonnet, and so did a start with no
-  model named. `scripts/verify-models.sh` repeats the check.
+  model named. That was against the real API with a login;
+  `scripts/verify-enforcement.sh` now covers it without one.
 - Unreachable MCP servers do not slow OpenCode's start. Four starts through
   `mi6 opencode run` with no servers, a local server that exits at once, a
   remote server whose host does not resolve, and both, took between 20 and

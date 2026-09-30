@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"github.com/jonathanleek/mi6/internal/build"
+	"github.com/jonathanleek/mi6/internal/enforce"
 	"github.com/jonathanleek/mi6/internal/resolve"
 	"github.com/jonathanleek/mi6/internal/tool"
 )
@@ -95,13 +96,40 @@ func Run(name string, args []string, opts Options) error {
 	for _, w := range r.Merged.Warnings {
 		fmt.Fprintln(stderr, "mi6: warning:", w)
 	}
+	refusals := enforce.Check(enforce.Input{
+		Tool: t, Layers: r.Layers, Merged: r.Merged, Dir: st.Dir, Checkout: st.Checkout, Args: args,
+		Display: func(p string) string { return resolve.DisplayPath(p, home) },
+	})
+	if len(refusals) > 0 {
+		return &Refused{Tool: name, Reasons: refusals}
+	}
 
 	// The layers' variables first, then the tool's own, so a layer cannot
-	// redirect the tool away from its set.
+	// redirect the tool away from its set. Under a policy the variables
+	// that would redirect the tool's model go too, wherever they came from.
 	dir := r.ToolDir(t)
-	env := withVars(os.Environ(), r.Env)
+	env := os.Environ()
+	if r.Merged.Policy.Active() {
+		env = enforce.Env(env, t)
+	}
+	env = withVars(env, r.Env)
 	env = withVars(env, append(t.Env(dir), ToolVar+"="+name, SetVar+"="+r.Dir))
 	return execFn(path, argv, env)
+}
+
+// Refused is the error when the model policy does not let the tool start.
+type Refused struct {
+	Tool    string
+	Reasons []string
+}
+
+func (r *Refused) Error() string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "not starting %s:", r.Tool)
+	for _, reason := range r.Reasons {
+		b.WriteString("\n  " + strings.ReplaceAll(reason, "\n", "\n  "))
+	}
+	return b.String()
 }
 
 // withVars returns env with each KEY=VALUE in vars set, replacing any

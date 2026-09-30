@@ -54,6 +54,17 @@ type Layer struct {
 // HasInstructions reports whether the layer has an AGENTS.md.
 func (l *Layer) HasInstructions() bool { return l.Instructions != "" }
 
+// Settings returns the layer's settings for the tool with that name, or nil.
+func (l *Layer) Settings(tool string) Object {
+	switch tool {
+	case "claude":
+		return l.Claude
+	case "opencode":
+		return l.OpenCode
+	}
+	return nil
+}
+
 // Load reads the layer at path. A missing file is not an error. A file that
 // exists but cannot be parsed is.
 func Load(path string) (*Layer, error) {

@@ -11,9 +11,11 @@ import (
 
 	"github.com/jonathanleek/mi6/internal/build"
 	"github.com/jonathanleek/mi6/internal/doctor"
+	"github.com/jonathanleek/mi6/internal/enforce"
 	"github.com/jonathanleek/mi6/internal/launch"
 	"github.com/jonathanleek/mi6/internal/resolve"
 	"github.com/jonathanleek/mi6/internal/scaffold"
+	"github.com/jonathanleek/mi6/internal/tool"
 )
 
 // version is set by the release build with -ldflags "-X main.version=...".
@@ -156,7 +158,31 @@ func runResolve(args []string) int {
 		return 1
 	}
 	printBuild(r, home)
+	if printRefusals(st, r, home) {
+		return 1
+	}
 	return 0
+}
+
+// printRefusals prints what the model policy would refuse for each tool,
+// and reports whether there was anything.
+func printRefusals(st *resolve.Stack, r *build.Result, home string) bool {
+	refused := false
+	for _, t := range tool.All() {
+		refusals := enforce.Check(enforce.Input{
+			Tool: t, Layers: r.Layers, Merged: r.Merged, Dir: st.Dir, Checkout: st.Checkout,
+			Display: func(p string) string { return resolve.DisplayPath(p, home) },
+		})
+		if len(refusals) == 0 {
+			continue
+		}
+		refused = true
+		fmt.Printf("\nrefused    %s\n", t.Name())
+		for _, reason := range refusals {
+			fmt.Printf("  %s\n", strings.ReplaceAll(reason, "\n", "\n  "))
+		}
+	}
+	return refused
 }
 
 func printBuild(r *build.Result, home string) {

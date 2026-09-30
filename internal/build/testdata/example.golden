@@ -53,8 +53,8 @@ Their style guide is at `docs/style.md` in the repo.
 == claude/settings.json
 {
   "availableModels": [
-    "sonnet",
-    "haiku"
+    "haiku",
+    "sonnet"
   ],
   "enforceAvailableModels": true,
   "permissions": {
@@ -122,6 +122,10 @@ Their style guide is at `docs/style.md` in the repo.
 == opencode/opencode.json
 {
   "$schema": "https://opencode.ai/config.json",
+  "enabled_providers": [
+    "anthropic",
+    "lmstudio"
+  ],
   "mcp": {
     "github": {
       "command": [
@@ -140,11 +144,20 @@ Their style guide is at `docs/style.md` in the repo.
   },
   "model": "anthropic/claude-sonnet-5",
   "provider": {
+    "anthropic": {
+      "whitelist": [
+        "claude-haiku-5",
+        "claude-sonnet-5"
+      ]
+    },
     "lmstudio": {
       "npm": "@ai-sdk/openai-compatible",
       "options": {
         "baseURL": "http://127.0.0.1:1234/v1"
-      }
+      },
+      "whitelist": [
+        "gpt-oss-120b"
+      ]
     }
   }
 }

@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"github.com/jonathanleek/mi6/internal/layer"
-	"github.com/jonathanleek/mi6/internal/merge"
 )
 
 // File is the name of the policy file in a layer.
@@ -141,7 +140,6 @@ func (p *Policy) Hash() string {
 // names a layer in errors and rules.
 func Merge(layers []*layer.Layer, display func(string) string) *Policy {
 	p := &Policy{Tags: map[string]Tag{}, Providers: map[string]Provider{}, Models: map[string]Model{}}
-	var combined layer.Object
 	for _, l := range layers {
 		if l.Models == nil {
 			continue
@@ -153,63 +151,48 @@ func Merge(layers []*layer.Layer, display func(string) string) *Policy {
 			}
 			continue
 		}
-		// Record where each definition and rule first appears.
+		// The first layer to define a tag or list a deny is the one named
+		// for it. A meaning takes the nearest layer, like any scalar.
 		for n, v := range object(l.Models["tags"]) {
-			if _, ok := p.Tags[n]; !ok {
-				p.Tags[n] = Tag{Name: n, Meaning: v.(string), From: name}
+			t, ok := p.Tags[n]
+			if !ok {
+				t = Tag{Name: n, From: name}
 			}
-		}
-		for _, v := range list(l.Models["deny"]) {
-			tag := v.(string)
-			if !hasRule(p.Deny, tag) {
-				p.Deny = append(p.Deny, Rule{Tag: tag, From: name})
-			}
-		}
-		if allow := list(l.Models["allow"]); len(allow) > 0 {
-			a := Allow{From: name}
-			for _, v := range allow {
-				a.Tags = append(a.Tags, v.(string))
-			}
-			p.Allows = append(p.Allows, a)
-		}
-		// Everything but allow follows the ordinary merge rule.
-		without := layer.Object{}
-		for k, v := range l.Models {
-			if k != "allow" {
-				without[k] = v
-			}
-		}
-		combined = merge.JSON(combined, without)
-	}
-	if combined == nil {
-		return p
-	}
-	for n, v := range object(combined["tags"]) {
-		if t, ok := p.Tags[n]; ok {
 			t.Meaning = v.(string)
 			p.Tags[n] = t
 		}
-	}
-	for id, v := range object(combined["providers"]) {
-		p.Providers[id] = Provider{ID: id, Tags: strs(object(v)["tags"])}
-	}
-	for key, v := range object(combined["models"]) {
-		entry := object(v)
-		m := Model{Key: key, IDs: map[string]string{}}
-		if i := strings.Index(key, "/"); i > 0 {
-			m.Provider = key[:i]
+		for id, v := range object(l.Models["providers"]) {
+			pr := p.Providers[id]
+			pr.ID = id
+			pr.Tags = union(pr.Tags, strs(object(v)["tags"]))
+			p.Providers[id] = pr
 		}
-		for k, x := range entry {
-			if k == "tags" {
-				m.Own = strs(x)
-				continue
+		for key, v := range object(l.Models["models"]) {
+			m, ok := p.Models[key]
+			if !ok {
+				m = Model{Key: key, IDs: map[string]string{}}
+				m.Provider, _, _ = strings.Cut(key, "/")
 			}
-			m.IDs[k] = x.(string)
+			for k, x := range object(v) {
+				if k == "tags" {
+					m.Own = union(m.Own, strs(x))
+				} else {
+					m.IDs[k] = x.(string)
+				}
+			}
+			p.Models[key] = m
 		}
-		m.Tags = append([]string{}, m.Own...)
-		if pr, ok := p.Providers[m.Provider]; ok {
-			m.Tags = union(m.Tags, pr.Tags)
+		for _, v := range list(l.Models["deny"]) {
+			if tag := v.(string); !hasRule(p.Deny, tag) {
+				p.Deny = append(p.Deny, Rule{Tag: tag, From: name})
+			}
 		}
+		if allow := strs(l.Models["allow"]); len(allow) > 0 {
+			p.Allows = append(p.Allows, Allow{Tags: allow, From: name})
+		}
+	}
+	for key, m := range p.Models {
+		m.Tags = union(append([]string{}, m.Own...), p.Providers[m.Provider].Tags)
 		p.Models[key] = m
 	}
 	p.check(layers, display)
