@@ -197,7 +197,7 @@ and a passed-through `--settings`. Milestone 12 builds those refusals.
 
 - The README's layer table and merge paragraph. `docs/verify.md`.
 
-### 17. Tagging skill
+### 17. Tagging skill (done, outside the repo)
 
 - Not in this repo. A skill in `~/.mi6/skills/` that runs `discover`,
   researches each new model's maker and origin from real sources, proposes
