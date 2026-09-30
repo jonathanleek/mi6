@@ -193,7 +193,7 @@ and a passed-through `--settings`. Milestone 12 builds those refusals.
 - `/v1/models` from each OpenAI-compatible provider in the merged
   `opencode.json`, and `opencode models`. Lists what the catalog lacks.
 
-### 16. Docs
+### 16. Docs (done)
 
 - The README's layer table and merge paragraph. `docs/verify.md`.
 

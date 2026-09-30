@@ -50,6 +50,7 @@ Then, in any repo:
 mi6 resolve    # which layers apply here, and the set they built
 mi6 claude     # Claude Code, under that set
 mi6 opencode   # OpenCode, under that set
+mi6 doctor     # would a launch from here work
 ```
 
 The first Claude Code start under a set asks you to log in. Each set is a
@@ -73,11 +74,49 @@ Any of these, all optional. There is no file that belongs to `mi6` itself.
 | `claude.json` | Claude Code settings, the same shape as `settings.json`. |
 | `opencode.json` | OpenCode settings. |
 | `env.json` | Variables to export to the tool. |
+| `models.json` | Model tags, and the rules that allow or deny them. |
 
 JSON merges key by key. Lists union, so a `permissions.deny` at the top of
-the tree reaches every repo and no layer below can lift it. The one
-exception is a model allowlist, which a nearer layer can narrow and never
-widen. [examples/](examples/) is a full tree to copy from.
+the tree reaches every repo and no layer below can lift it.
+[examples/](examples/) is a full tree to copy from.
+
+## Model policy
+
+Models carry tags, and a layer allows or denies tags. In `~/.mi6/models.json`:
+
+```json
+{
+  "tags": {"chinese": "Developed by a company based in China", "network": "Served on the home network"},
+  "providers": {"anthropic": {"tags": []}, "lmstudio": {"tags": ["network"]}},
+  "models": {
+    "anthropic/claude-sonnet-5": {"tags": [], "claude": "sonnet"},
+    "lmstudio/qwen3-coder-30b": {"tags": ["chinese"]}
+  },
+  "deny": ["chinese"]
+}
+```
+
+A private project's layer adds `{"allow": ["network"]}` and nothing else.
+A deny reaches every repo below it and no layer can lift it; an allow can
+only narrow. A tag has to be defined before it is used, so a misspelled
+deny is an error instead of a rule that denies nothing. A model that is
+not in the catalog is never allowed.
+
+`mi6` writes the result into each tool's own model list, and the tool
+enforces it: `--model`, the `/model` picker, and the default all obey.
+A layer or a checkout that would get around the list, such as a repo's
+`.claude/settings.json` widening it, refuses the launch with the file
+named. Every launch is logged to `~/.local/state/mi6/audit.jsonl` with
+what was allowed and why.
+
+```
+mi6 models              # the catalog, and what is allowed here
+mi6 models discover     # what the providers serve that the catalog lacks
+mi6 tags add chinese "Developed by a company based in China"
+mi6 tag lmstudio/qwen3-coder-30b chinese
+```
+
+Rules are hand-edits, so a policy change shows in a diff.
 
 A `.mi6/` inside a cloned repo counts only after `git config mi6.trust true`
 in that clone, because its `mcp.json` is a command that runs on your
@@ -106,6 +145,7 @@ write one source of truth into each tool's native files, across many tools.
 | Nothing written into the repo | yes | no, native files in the project | yes |
 | Claude Code and OpenCode from one source | Claude only | yes, many tools | yes, two tools |
 | Skills, MCP, permissions | credentials and env per profile | yes | yes |
+| Model policy by tag, enforced, with an audit log | no | no | yes |
 
 The gap is the combination in the last column. It matters to people with a
 folder tree of client work and worktree-based tools, and it is narrow. The

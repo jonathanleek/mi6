@@ -104,6 +104,39 @@ export OPENCODE_CONFIG_DIR=$SET/opencode OPENCODE_CONFIG=$SET/opencode/opencode.
 - `unset OPENCODE_CONFIG_DIR OPENCODE_CONFIG OPENCODE_DISABLE_EXTERNAL_SKILLS`
   when done.
 
+## Model policy
+
+The example tree denies `chinese` at the top and `frontier` under
+`clients/`, so the globex set allows Claude Code `haiku` and `sonnet` and
+OpenCode those two plus `lmstudio/gpt-oss-120b`.
+
+- `m resolve` ends with a `models` section that says so, and names the
+  layer behind each removed model.
+- `m models` lists every catalog model with its tags and its standing per
+  tool. `m tags` lists the five tags with how many models carry each.
+- `m doctor` says `ok models policy in force: claude 2 allowed, opencode
+  3 allowed` and `ok audit`.
+- In the Claude Code session above, `/model` offers Sonnet and Haiku and
+  refuses Opus. `claude --model opus -p "which model are you"` under the
+  set answers as Sonnet.
+- `opencode debug config` under the set shows `enabled_providers` and a
+  `whitelist` under each provider. `opencode models` lists only the three.
+- `m claude --settings '{}'` is refused with the argument named.
+- Write `{"availableModels": ["opus"]}` to
+  `$SB/home/Documents/git/work/clients/globex/pipeline/.claude/settings.json`.
+  `m claude` and `m resolve` both refuse, naming the file. Remove it.
+- Write `{"allow": ["network"]}` to the globex layer's `models.json`.
+  `m claude` refuses with `no model is allowed here` and every catalog
+  model's reason; `m opencode` refuses because the work layer's default
+  model is a cloud model. Remove it.
+- `tail -1 $SB/state/mi6/audit.jsonl` is the last of those launches, with
+  its outcome and reasons. Every launch above has a line.
+- `m models discover` reports LM Studio unreachable unless it is running,
+  and lists what `opencode models` knows that the catalog lacks.
+
+`scripts/verify-enforcement.sh` covers the tool side of this list without
+a login; see above.
+
 ## Worktrees
 
 - `git -C <pipeline> worktree add $SB/task -b task`.
