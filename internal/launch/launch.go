@@ -9,8 +9,10 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/jonathanleek/mi6/internal/audit"
 	"github.com/jonathanleek/mi6/internal/build"
 	"github.com/jonathanleek/mi6/internal/enforce"
+	"github.com/jonathanleek/mi6/internal/models"
 	"github.com/jonathanleek/mi6/internal/resolve"
 	"github.com/jonathanleek/mi6/internal/tool"
 )
@@ -34,11 +36,15 @@ type Options struct {
 	Stderr io.Writer
 	// Exec replaces the process. Nil means syscall.Exec. Tests set it.
 	Exec func(path string, argv []string, env []string) error
+	// Version is mi6's version, for the audit log.
+	Version string
 }
 
 // Run starts the named tool with args. On success it does not return,
 // because the process is replaced. It returns an error when the tool is
-// unknown, not on the path, or the stack cannot be built.
+// unknown, not on the path, the stack cannot be built, the model policy
+// refuses the launch, or the audit log cannot be written. Every launch
+// but a nested one is logged, bare and refused ones included.
 func Run(name string, args []string, opts Options) error {
 	stderr := opts.Stderr
 	if stderr == nil {
@@ -61,10 +67,7 @@ func Run(name string, args []string, opts Options) error {
 	// resolved path. A program may look at its own name.
 	argv := append([]string{t.Command()}, args...)
 
-	if opts.Bare {
-		return execFn(path, argv, os.Environ())
-	}
-	if os.Getenv(ToolVar) == name {
+	if os.Getenv(ToolVar) == name && !opts.Bare {
 		// Already inside a session of this tool that mi6 started. The
 		// environment is set; build nothing and start the tool as is.
 		return execFn(path, argv, os.Environ())
@@ -74,6 +77,24 @@ func Run(name string, args []string, opts Options) error {
 	if err != nil {
 		return err
 	}
+	logPath := audit.Path(build.StateDir(home))
+	cwd := opts.Dir
+	if cwd == "" {
+		if cwd, err = os.Getwd(); err != nil {
+			return err
+		}
+	}
+	show := func(p string) string { return resolve.DisplayPath(p, home) }
+
+	if opts.Bare {
+		entry := audit.New(opts.Version, name, cwd)
+		entry.Outcome = audit.Bare
+		if err := audit.Append(logPath, entry); err != nil {
+			return err
+		}
+		return execFn(path, argv, os.Environ())
+	}
+
 	st, err := resolve.Resolve(resolve.Options{Dir: opts.Dir, Home: home})
 	if err != nil {
 		return err
@@ -82,10 +103,18 @@ func Run(name string, args []string, opts Options) error {
 		fmt.Fprintln(stderr, "mi6:", n)
 	}
 	for _, s := range st.Skipped {
-		fmt.Fprintf(stderr, "mi6: skipped %s: %s\n", resolve.DisplayPath(s.Path, home), s.Reason)
+		fmt.Fprintf(stderr, "mi6: skipped %s: %s\n", show(s.Path), s.Reason)
+	}
+	entry := audit.New(opts.Version, name, st.Dir)
+	for _, l := range st.Layers {
+		entry.Layers = append(entry.Layers, show(l.Path))
 	}
 	if len(st.Layers) == 0 {
 		fmt.Fprintf(stderr, "mi6: no %s folder applies here. Starting %s with its plain config.\n", resolve.LayerDir, name)
+		entry.Outcome = audit.Started
+		if err := audit.Append(logPath, entry); err != nil {
+			return err
+		}
 		return execFn(path, argv, os.Environ())
 	}
 
@@ -97,11 +126,24 @@ func Run(name string, args []string, opts Options) error {
 		fmt.Fprintln(stderr, "mi6: warning:", w)
 	}
 	refusals := enforce.Check(enforce.Input{
-		Tool: t, Layers: r.Layers, Merged: r.Merged, Dir: st.Dir, Checkout: st.Checkout, Args: args,
-		Display: func(p string) string { return resolve.DisplayPath(p, home) },
+		Tool: t, Layers: r.Layers, Merged: r.Merged, Dir: st.Dir, Checkout: st.Checkout, Args: args, Display: show,
 	})
+	entry.Set = show(r.Dir)
+	var result *models.Result
+	if e, ok := t.(tool.Enforcer); ok {
+		result = r.Merged.Policy.Evaluate(name, e.ID())
+	}
+	entry.WithPolicy(r.Merged.Policy, result).WithDefault(enforce.Default(r.Merged.Settings(name)))
 	if len(refusals) > 0 {
+		entry.Outcome, entry.Reasons = audit.Refused, refusals
+		if err := audit.Append(logPath, entry); err != nil {
+			return err
+		}
 		return &Refused{Tool: name, Reasons: refusals}
+	}
+	entry.Outcome = audit.Started
+	if err := audit.Append(logPath, entry); err != nil {
+		return err
 	}
 
 	// The layers' variables first, then the tool's own, so a layer cannot

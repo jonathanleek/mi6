@@ -176,7 +176,7 @@ and a passed-through `--settings`. Milestone 12 builds those refusals.
 - Remove the v2 narrowing rule from `merge`.
 - Convert the example tree and the golden test.
 
-### 13. Audit and reporting
+### 13. Audit and reporting (done)
 
 - `audit.jsonl`: one line per launch, started, refused, or bare. A launch
   that cannot write it is refused.

@@ -1,7 +1,9 @@
 package tool
 
 import (
+	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/jonathanleek/mi6/internal/layer"
 	"github.com/jonathanleek/mi6/internal/merge"
@@ -43,6 +45,20 @@ func (Claude) CheckoutFiles() []string {
 	return []string{".claude/settings.json", ".claude/settings.local.json"}
 }
 func (Claude) CheckoutKeys() []string { return nil }
+
+// ~/.claude is not read under CLAUDE_CONFIG_DIR, so nothing outside the set
+// applies but the managed settings.
+func (Claude) OutsideFiles(string) []string { return nil }
+func (Claude) ManagedPaths() []string {
+	switch runtime.GOOS {
+	case "darwin":
+		return []string{"/Library/Application Support/ClaudeCode/managed-settings.json"}
+	case "windows":
+		return []string{filepath.Join(os.Getenv("ProgramData"), "ClaudeCode", "managed-settings.json")}
+	default:
+		return []string{"/etc/claude-code/managed-settings.json"}
+	}
+}
 
 func (c Claude) Plan(m *merge.Merged, dir string) (*set.Plan, error) {
 	settings := layer.Object{}

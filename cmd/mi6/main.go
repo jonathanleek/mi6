@@ -71,7 +71,7 @@ func run(args []string) int {
 // runLaunch returns only on failure: a successful launch replaces the
 // process.
 func runLaunch(name string, args []string, bare bool) int {
-	err := launch.Run(name, args, launch.Options{Bare: bare})
+	err := launch.Run(name, args, launch.Options{Bare: bare, Version: version})
 	fmt.Fprintln(os.Stderr, "mi6:", err)
 	return 2
 }
@@ -219,6 +219,43 @@ func printBuild(r *build.Result, home string) {
 	}
 	for _, w := range r.Merged.Warnings {
 		fmt.Printf("warning  %s\n", w)
+	}
+	printModels(r)
+}
+
+// printModels prints the model policy: the rules in force and, for each
+// tool, what is allowed and what was removed and why.
+func printModels(r *build.Result) {
+	p := r.Merged.Policy
+	if p == nil || (len(p.Models) == 0 && !p.Active()) {
+		return
+	}
+	fmt.Println()
+	if !p.Active() {
+		fmt.Printf("models     %d in the catalog, no rule applies here\n", len(p.Models))
+		return
+	}
+	fmt.Printf("models     policy %s\n", p.Hash())
+	for _, d := range p.Deny {
+		fmt.Printf("  deny   %-10s %s\n", d.Tag, d.From)
+	}
+	for _, a := range p.Allows {
+		fmt.Printf("  allow  %-10s %s\n", strings.Join(a.Tags, ","), a.From)
+	}
+	for _, t := range tool.All() {
+		e, ok := t.(tool.Enforcer)
+		if !ok {
+			fmt.Printf("  %-9s cannot enforce a model list\n", t.Name())
+			continue
+		}
+		res := p.Evaluate(t.Name(), e.ID())
+		fmt.Printf("  %-9s allowed  %s\n", t.Name(), strings.Join(res.IDs(), ", "))
+		for _, x := range res.Removed {
+			fmt.Printf("  %-9s removed  %-32s %s\n", "", x.Key, x.Why)
+		}
+		if d := enforce.Default(r.Merged.Settings(t.Name())); d != "" {
+			fmt.Printf("  %-9s default  %s\n", "", d)
+		}
 	}
 }
 

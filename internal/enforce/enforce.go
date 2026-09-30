@@ -104,10 +104,7 @@ func Check(in Input) []string {
 // Both tools read such files, and they outrank the set's.
 func checkout(in Input, e tool.Enforcer, name string) []string {
 	var refusals []string
-	keys := append(append(append([]string{}, e.ListKeys()...), e.ModelKeys()...), e.CheckoutKeys()...)
-	for _, v := range e.Vars() {
-		keys = append(keys, "env."+v)
-	}
+	keys := touchKeys(e)
 	for _, dir := range dirs(in.Dir, in.Checkout) {
 		for _, rel := range e.CheckoutFiles() {
 			path := filepath.Join(dir, rel)
@@ -128,6 +125,43 @@ func checkout(in Input, e tool.Enforcer, name string) []string {
 		}
 	}
 	return refusals
+}
+
+// Outside returns a warning for each settings file outside the set that
+// the tool still reads and that touches models. The set's lists win over
+// such a file, but what the set does not write, the file can still set.
+func Outside(t tool.Tool, home string, display func(string) string) []string {
+	e, ok := t.(tool.Enforcer)
+	if !ok {
+		return nil
+	}
+	var warnings []string
+	for _, path := range e.OutsideFiles(home) {
+		b, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		obj, err := layer.ParseObject(b)
+		if err != nil {
+			warnings = append(warnings, fmt.Sprintf("%s cannot be read, and %s reads it under the set: %v", display(path), t.Name(), err))
+			continue
+		}
+		for _, key := range touchKeys(e) {
+			for _, m := range find(obj, key) {
+				warnings = append(warnings, fmt.Sprintf("%s sets %s; %s reads it under the set, and the set does not pin everything under it", display(path), m.path, t.Name()))
+			}
+		}
+	}
+	return warnings
+}
+
+// touchKeys are the keys that touch models in a file the set does not own.
+func touchKeys(e tool.Enforcer) []string {
+	keys := append(append(append([]string{}, e.ListKeys()...), e.ModelKeys()...), e.CheckoutKeys()...)
+	for _, v := range e.Vars() {
+		keys = append(keys, "env."+v)
+	}
+	return keys
 }
 
 // dirs lists dir and its ancestors up to checkout. Outside a checkout, or
@@ -192,6 +226,16 @@ func Explain(p *models.Policy, r *models.Result) string {
 		fmt.Fprintf(&b, "    %-32s tags: %-28s removed: %s\n", x.Key, strings.Join(x.Tags, ", "), x.Why)
 	}
 	return strings.TrimRight(b.String(), "\n")
+}
+
+// Default is the model a tool's merged settings name as its default, or "".
+func Default(settings layer.Object) string {
+	for _, m := range find(settings, "model") {
+		if s, ok := m.value.(string); ok {
+			return s
+		}
+	}
+	return ""
 }
 
 // match is one settings value found by find.

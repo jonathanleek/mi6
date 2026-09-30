@@ -285,7 +285,9 @@ entry in the checkout's config is refused. `OPENCODE_CONFIG_CONTENT` is
 read after the set and overrides it, so `mi6` removes it from the
 environment. Two sources are read after the set and are out of reach: the
 config of an OpenCode console account's organization, and config an
-administrator installs on the machine. `mi6 doctor` reports both.
+administrator installs on the machine. `mi6 doctor` reports the second
+when it exists. The first lives in OpenCode's database, so it is not
+checked.
 
 **A third tool** declares how it enforces a model list. Under a policy, a
 tool that cannot is refused.
@@ -317,9 +319,11 @@ and `dir` join the two.
 ### Commands
 
 `mi6 resolve` prints the rules in force, each tool's allowed list, and each
-removed model with its reason. `mi6 doctor` reports every refusal above, and
-warns about a redirecting variable in the current shell and about model or
-provider keys in `~/.config/opencode`.
+removed model with its reason. `mi6 doctor` reports every refusal above,
+checks that the audit log can be written, and warns about a redirecting
+variable in the current shell, about model or provider keys in a file the
+tool still reads outside the set such as `~/.config/opencode`, and about
+an administrator's config on the machine.
 
 The catalog has its own commands. Rules do not: a policy change is a
 hand-edit, so it is deliberate and shows in a diff.

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -168,8 +170,147 @@ func TestLaunchBare(t *testing.T) {
 	if line(t, r.stdout, "ARGS") != "x" {
 		t.Errorf("args:\n%s", r.stdout)
 	}
-	if entries, _ := os.ReadDir(filepath.Join(state, "mi6")); len(entries) != 0 {
+	if _, err := os.Stat(filepath.Join(state, "mi6", "sets")); err == nil {
 		t.Error("bare launch built a set")
+	}
+	if e := auditLast(t, state); e["outcome"] != "bare" || e["tool"] != "claude" {
+		t.Errorf("audit entry %v", e)
+	}
+}
+
+// auditLast returns the last line of the audit log, decoded.
+func auditLast(t *testing.T, state string) map[string]any {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(state, "mi6", "audit.jsonl"))
+	if err != nil {
+		t.Fatalf("no audit log: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(b)), "\n")
+	var e map[string]any
+	if err := json.Unmarshal([]byte(lines[len(lines)-1]), &e); err != nil {
+		t.Fatalf("audit line %q: %v", lines[len(lines)-1], err)
+	}
+	return e
+}
+
+func writeLayer(t *testing.T, dir, name, content string) {
+	t.Helper()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+const testCatalog = `{
+	"tags": {"chinese": "Made in China", "network": "On the home network"},
+	"providers": {"lmstudio": {"tags": ["network"]}, "anthropic": {}},
+	"models": {"anthropic/claude-sonnet-5": {"claude": "sonnet"}, "lmstudio/qwen": {"tags": ["chinese"]}, "lmstudio/oss": {}},
+	"deny": ["chinese"]
+}`
+
+func TestAuditLogsAPolicyLaunch(t *testing.T) {
+	home, state, project := fixture(t, true)
+	writeLayer(t, filepath.Join(home, ".mi6"), "models.json", testCatalog)
+	r := mi6(t, home, state, project, nil, "opencode", "run", "hi")
+	if r.code != 0 {
+		t.Fatalf("exit %d\n%s", r.code, r.stderr)
+	}
+	e := auditLast(t, state)
+	if e["outcome"] != "started" || e["tool"] != "opencode" || e["dir"] != project || e["mi6"] == "" {
+		t.Errorf("entry %v", e)
+	}
+	if !strings.HasPrefix(e["policy"].(string), "sha256:") {
+		t.Errorf("policy %v", e["policy"])
+	}
+	if got := fmt.Sprint(e["allowed"]); got != "[anthropic/claude-sonnet-5 lmstudio/oss]" {
+		t.Errorf("allowed %v", got)
+	}
+	if got := fmt.Sprint(e["removed"]); !strings.Contains(got, "lmstudio/qwen") || !strings.Contains(got, "deny chinese") {
+		t.Errorf("removed %v", got)
+	}
+	if got := fmt.Sprint(e["deny"]); !strings.Contains(got, "chinese") || !strings.Contains(got, "~/.mi6") {
+		t.Errorf("deny %v", got)
+	}
+	if got := fmt.Sprint(e["layers"]); !strings.Contains(got, "~/.mi6") || !strings.Contains(got, "~/git/.mi6") {
+		t.Errorf("layers %v", got)
+	}
+	if got := fmt.Sprint(e["set"]); !strings.HasPrefix(got, "~/") && !strings.Contains(got, "sets") {
+		t.Errorf("set %v", got)
+	}
+}
+
+func TestPolicyRefusalIsLoggedAndBlocks(t *testing.T) {
+	home, state, project := fixture(t, true)
+	writeLayer(t, filepath.Join(home, ".mi6"), "models.json", testCatalog)
+	// The tree layer allows only network models, which leaves Claude Code nothing.
+	writeLayer(t, filepath.Join(home, "git", ".mi6"), "models.json", `{"allow": ["network"]}`)
+	r := mi6(t, home, state, project, nil, "claude", "-p", "hi")
+	if r.code == 0 || strings.Contains(r.stdout, "TOOL=claude") {
+		t.Fatalf("the tool started:\n%s", r.stdout)
+	}
+	if !strings.Contains(r.stderr, "not starting claude:") || !strings.Contains(r.stderr, "no model is allowed here") || !strings.Contains(r.stderr, "not in allow (~/git/.mi6)") {
+		t.Errorf("stderr:\n%s", r.stderr)
+	}
+	e := auditLast(t, state)
+	if e["outcome"] != "refused" || fmt.Sprint(e["allowed"]) != "[]" || !strings.Contains(fmt.Sprint(e["reasons"]), "no model is allowed") {
+		t.Errorf("entry %v", e)
+	}
+	// OpenCode still starts there, and its variables were stripped.
+	r = mi6(t, home, state, project, []string{"OPENCODE_CONFIG_CONTENT={}", "MI6_TEST_KEEP=1"}, "opencode", "run")
+	if r.code != 0 {
+		t.Fatalf("opencode: exit %d\n%s", r.code, r.stderr)
+	}
+	if strings.Contains(r.stdout, "OPENCODE_CONFIG_CONTENT") || line(t, r.stdout, "MI6_TEST_KEEP") != "1" {
+		t.Errorf("environment:\n%s", r.stdout)
+	}
+}
+
+func TestUnwritableAuditLogRefuses(t *testing.T) {
+	home, state, project := fixture(t, true)
+	if err := os.MkdirAll(filepath.Join(state, "mi6", "audit.jsonl"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{{"claude"}, {"--bare", "claude"}} {
+		r := mi6(t, home, state, project, nil, args...)
+		if r.code == 0 || strings.Contains(r.stdout, "TOOL=") || !strings.Contains(r.stderr, "audit log") {
+			t.Errorf("%v: exit %d\nstdout %s\nstderr %s", args, r.code, r.stdout, r.stderr)
+		}
+	}
+}
+
+func TestResolveAndDoctorShowThePolicy(t *testing.T) {
+	home, state, project := fixture(t, true)
+	writeLayer(t, filepath.Join(home, ".mi6"), "models.json", testCatalog)
+	r := mi6(t, home, state, project, nil, "resolve")
+	if r.code != 0 {
+		t.Fatalf("exit %d\n%s", r.code, r.stderr)
+	}
+	for _, want := range []string{"models     policy sha256:", "deny   chinese    ~/.mi6", "claude    allowed  sonnet", "opencode  allowed  anthropic/claude-sonnet-5, lmstudio/oss", "removed  lmstudio/qwen"} {
+		if !strings.Contains(r.stdout, want) {
+			t.Errorf("resolve lacks %q:\n%s", want, r.stdout)
+		}
+	}
+	r = mi6(t, home, state, project, []string{"ANTHROPIC_BASE_URL=http://x"}, "doctor")
+	if r.code != 0 {
+		t.Fatalf("doctor exit %d\n%s%s", r.code, r.stdout, r.stderr)
+	}
+	for _, want := range []string{"ok    models   policy in force: claude 1 allowed, opencode 2 allowed", "warn  env      ANTHROPIC_BASE_URL is set in this shell", "ok    audit    "} {
+		if !strings.Contains(r.stdout, want) {
+			t.Errorf("doctor lacks %q:\n%s", want, r.stdout)
+		}
+	}
+
+	// A refusal fails resolve and doctor, and names the tool.
+	writeLayer(t, filepath.Join(home, "git", ".mi6"), "claude.json", `{"availableModels": ["opus"]}`)
+	r = mi6(t, home, state, project, nil, "resolve")
+	if r.code != 1 || !strings.Contains(r.stdout, "refused    claude\n  claude.json in ~/git/.mi6 sets availableModels") {
+		t.Errorf("resolve exit %d:\n%s", r.code, r.stdout)
+	}
+	r = mi6(t, home, state, project, nil, "doctor")
+	if r.code != 1 || !strings.Contains(r.stdout, "fail  models   claude: claude.json in ~/git/.mi6 sets availableModels") {
+		t.Errorf("doctor exit %d:\n%s", r.code, r.stdout)
 	}
 }
 

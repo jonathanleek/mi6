@@ -55,6 +55,14 @@ type Enforcer interface {
 	// CheckoutKeys are further keys refused in a checkout file, for what
 	// the set cannot pin, such as a provider's address.
 	CheckoutKeys() []string
+	// OutsideFiles are settings files outside the set that the tool still
+	// reads under it. The set's lists win over them, but doctor warns when
+	// one touches models. home is the user's home directory.
+	OutsideFiles(home string) []string
+	// ManagedPaths are where an administrator's config would be, which is
+	// read after the set and is out of mi6's reach. doctor reports one
+	// that exists.
+	ManagedPaths() []string
 }
 
 var registry = map[string]Tool{}

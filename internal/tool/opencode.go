@@ -1,7 +1,9 @@
 package tool
 
 import (
+	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -52,6 +54,33 @@ func (OpenCode) CheckoutFiles() []string {
 	return []string{"opencode.json", "opencode.jsonc", ".opencode/opencode.json", ".opencode/opencode.jsonc"}
 }
 func (OpenCode) CheckoutKeys() []string { return []string{"provider"} }
+
+// OpenCode keeps reading its global config under OPENCODE_CONFIG_DIR.
+func (OpenCode) OutsideFiles(home string) []string {
+	dir := filepath.Join(home, ".config")
+	if x := os.Getenv("XDG_CONFIG_HOME"); x != "" {
+		dir = x
+	}
+	return []string{filepath.Join(dir, "opencode", "opencode.json"), filepath.Join(dir, "opencode", "opencode.jsonc")}
+}
+
+// Paths from OpenCode's config/managed.ts at 1.18.30. The console account's
+// organization config is read after the set too, but it lives in
+// OpenCode's database, so it is not checked.
+func (OpenCode) ManagedPaths() []string {
+	switch runtime.GOOS {
+	case "darwin":
+		return []string{
+			"/Library/Application Support/opencode",
+			"/Library/Managed Preferences/ai.opencode.managed.plist",
+			filepath.Join("/Library/Managed Preferences", os.Getenv("USER"), "ai.opencode.managed.plist"),
+		}
+	case "windows":
+		return []string{filepath.Join(os.Getenv("ProgramData"), "opencode")}
+	default:
+		return []string{"/etc/opencode"}
+	}
+}
 
 func (o OpenCode) Plan(m *merge.Merged, dir string) (*set.Plan, error) {
 	cfg := layer.Object{}
