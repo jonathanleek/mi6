@@ -150,11 +150,14 @@ and the design now refuses each: the checkout's own tool settings in both
 tools, a trusted checkout's `ANTHROPIC_BASE_URL`, `OPENCODE_CONFIG_CONTENT`,
 and a passed-through `--settings`. Milestone 12 builds those refusals.
 
-### 11. Policy engine
+### 11. Policy engine (done)
 
 - A `models` package: load and merge `models.json`, compute each tool's
   allowed list with the reason each other model was removed, and report
-  every refusal in the design's table. Table tests.
+  the refusals that come from the catalog itself: an undefined tag, a
+  model without a provider entry, a file with the wrong shape. Table
+  tests. The refusals that need a tool's settings or the checkout are
+  milestone 12.
 - `layer` loads `models.json`. `mi6 init` scaffolds an empty one.
 
 ### 12. Enforcement

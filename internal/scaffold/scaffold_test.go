@@ -11,7 +11,7 @@ import (
 	"github.com/jonathanleek/mi6/internal/layer"
 )
 
-var wantFiles = []string{"README.md", "AGENTS.md", "mcp.json", "claude.json", "opencode.json", "env.json", "skills/README.md"}
+var wantFiles = []string{"README.md", "AGENTS.md", "mcp.json", "claude.json", "opencode.json", "env.json", "models.json", "skills/README.md"}
 
 func TestCreateThenKeep(t *testing.T) {
 	home := t.TempDir()
@@ -42,7 +42,7 @@ func TestCreateThenKeep(t *testing.T) {
 	if !strings.HasPrefix(l.Instructions, "# Rules for ~/git/work\n") {
 		t.Errorf("instructions %q", l.Instructions)
 	}
-	if len(l.Skills) != 0 || l.MCP["mcpServers"] == nil || l.Claude["permissions"] == nil || l.OpenCode["$schema"] == nil || l.Env == nil {
+	if len(l.Skills) != 0 || l.MCP["mcpServers"] == nil || l.Claude["permissions"] == nil || l.OpenCode["$schema"] == nil || l.Env == nil || l.Models["tags"] == nil {
 		t.Errorf("layer %+v", l)
 	}
 
