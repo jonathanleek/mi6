@@ -72,6 +72,15 @@ against a set that already has a login. `scripts/verify-models.sh <root>`
 checks that a model allowlist in a layer is enforced, where the root is the
 folder holding `home/` and `state/`.
 
+`scripts/verify-enforcement.sh` needs no login and no scratch home. It
+starts two fake servers from `scripts/mock/` that record the model of every
+request, one speaking the OpenAI API for OpenCode and one speaking the
+Anthropic API for Claude Code, and runs each tool against them under a
+set that allows one model. Every case prints what the tool sent and
+whether that matches what `docs/design.md` records, including the ways
+around the lists that the design refuses. Run it after a tool upgrade. A
+`DIFF` line means the tool changed.
+
 ## OpenCode
 
 OpenCode keeps provider logins outside the config directory, so no login is

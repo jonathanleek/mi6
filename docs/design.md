@@ -210,6 +210,8 @@ Each refusal names the file and layer at fault.
 | The allowed list is empty | that tool |
 | A model the tool's settings name is not allowed | that tool |
 | A layer sets a variable that redirects the tool's model | that tool |
+| The checkout's own tool settings touch models | that tool |
+| A passed-through argument replaces the tool's settings | that tool |
 | The tool has no way to enforce a model list | that tool |
 | The audit log cannot be written | every tool |
 
@@ -227,6 +229,20 @@ mi6: not starting claude: no model is allowed here
 
 The model lists belong to `models.json` alone, so a hand-written list in a
 tool's settings is an error rather than a second place to look.
+
+The checkout is the one place in the stack that someone else writes to, and
+both tools read settings from it that outrank the set's. So under a policy
+`mi6` reads the checkout's tool settings before the launch and refuses if
+any of them touches models: `.claude/settings.json` and
+`.claude/settings.local.json` for Claude Code, and `opencode.json` and
+`.opencode/opencode.json` from the working directory up to the checkout's
+root for OpenCode. Touching models means a model list, a model key, a
+redirecting variable, or a provider entry. Anything else in those files,
+and the checkout's `CLAUDE.md` and `AGENTS.md`, is left alone. Each tool
+has a switch that ignores the checkout's settings outright,
+`--setting-sources user` and `OPENCODE_DISABLE_PROJECT_CONFIG`, but the
+Claude Code one drops the checkout's `CLAUDE.md` too, so `mi6` refuses
+instead.
 
 ### How each tool enforces it
 
@@ -246,14 +262,30 @@ Variables can point Claude Code's model names somewhere else:
 `ANTHROPIC_BASE_URL`. Under a policy a layer that sets one, in `env.json` or
 in the `env` key of `claude.json`, is refused, and `mi6` removes them from
 the environment it passes on, so one exported in your shell does not reach
-the tool either.
+the tool either. `--settings` and `--setting-sources` in the arguments
+passed through are refused, since the first outranks the set's settings and
+the second changes what is read. Verified on 2026-09-29: a `--model`
+outside the list is replaced, the default model obeys the list, and so
+does the one background request an interactive session makes.
 
 **OpenCode.** `enabled_providers` gets the providers with an allowed model,
 which also shuts out any provider defined in `~/.config/opencode`.
 `provider.<id>.whitelist` gets each provider's allowed models. `model`,
 `small_model`, and every `agent.*.model` in the merged settings must be
-allowed. How far OpenCode enforces these is not verified yet; v3 checks it
-first.
+allowed. Verified on 2026-09-29: a model outside the lists is refused
+through `-m`, through the API the `/model` picker uses, as an agent's
+model, and as the default, with no request sent. A `small_model` outside
+the lists falls back to an allowed one.
+
+OpenCode reads its config in a fixed order, and the set's file is read
+last of the files on disk because `mi6` sets `OPENCODE_CONFIG_DIR`. So
+the set's lists win over the global file and over the checkout's. What the
+set does not write, the checkout can still set, which is why a provider
+entry in the checkout's config is refused. `OPENCODE_CONFIG_CONTENT` is
+read after the set and overrides it, so `mi6` removes it from the
+environment. Two sources are read after the set and are out of reach: the
+config of an OpenCode console account's organization, and config an
+administrator installs on the machine. `mi6 doctor` reports both.
 
 **A third tool** declares how it enforces a model list. Under a policy, a
 tool that cannot is refused.
@@ -537,6 +569,15 @@ Checked on 2026-09-23 and 2026-09-24 with Claude Code 2.1.281 and OpenCode
 - What follows the login rather than the config directory: the claude.ai
   connectors, and skills from plugins tied to the account. They appear in
   every set. Claude Code's built-in skills appear in every set too.
+- Model enforcement in both tools, on 2026-09-29 with Claude Code 2.1.285
+  and OpenCode 1.18.30, against fake servers that record the model of every
+  request, so no login is needed. `scripts/verify-enforcement.sh` repeats
+  the checks. The findings are in the model policy section, in short: the
+  set's lists hold against `--model`, `-m`, the `/model` picker, agents,
+  defaults, and background requests, and against the global config. They
+  do not hold against the checkout's own tool settings, which outrank the
+  set in both tools, against `OPENCODE_CONFIG_CONTENT`, or against a
+  passed-through `--settings`. The design refuses each of those.
 - `availableModels` in a set's `settings.json` is enforced, on 2026-09-24:
   with `["sonnet"]` and `enforceAvailableModels: true` in a layer,
   `claude --model opus -p` answered as Sonnet, and so did a start with no

@@ -140,16 +140,15 @@ enforce its lists, 12 changes shape.
 - Hand-written model lists in a tool's settings become an error.
 - An audit log of every launch, always on.
 
-### 10. Verify OpenCode
+### 10. Verify OpenCode (done)
 
-- Install OpenCode with `brew install opencode`.
-- With `enabled_providers` and `provider.<id>.whitelist` in a set, check
-  whether OpenCode refuses a model outside them through `--model`, `/model`,
-  `small_model`, and an agent's `model`.
-- Check which wins when `~/.config/opencode` also sets `enabled_providers`.
-- Check whether Claude Code's background Haiku calls obey `availableModels`.
-- Extend `scripts/verify-models.sh`, and write the findings into the
-  design's verified list.
+Done on 2026-09-29 against fake servers, so no login was needed:
+`scripts/verify-enforcement.sh`. OpenCode enforces its lists everywhere
+the design needs, and so does Claude Code, including the background
+request of an interactive session. Five ways around the lists were found
+and the design now refuses each: the checkout's own tool settings in both
+tools, a trusted checkout's `ANTHROPIC_BASE_URL`, `OPENCODE_CONFIG_CONTENT`,
+and a passed-through `--settings`. Milestone 12 builds those refusals.
 
 ### 11. Policy engine
 
@@ -164,7 +163,13 @@ enforce its lists, 12 changes shape.
   `availableModels` and `enforceAvailableModels`. OpenCode writes
   `enabled_providers` and each provider's `whitelist`.
 - Launch refuses on any refusal from 11, checks every model a tool's
-  settings name, and removes the redirecting variables from the environment.
+  settings name, and removes the redirecting variables from the environment,
+  `OPENCODE_CONFIG_CONTENT` among them.
+- Launch reads the checkout's own tool settings, `.claude/settings.json`,
+  `.claude/settings.local.json`, and OpenCode's `opencode.json` and
+  `.opencode/opencode.json` up to the checkout root, and refuses if any
+  touches models. It refuses `--settings` and `--setting-sources` in the
+  arguments passed to Claude Code.
 - Remove the v2 narrowing rule from `merge`.
 - Convert the example tree and the golden test.
 
