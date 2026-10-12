@@ -104,9 +104,10 @@ not in the catalog is never allowed.
 
 `mi6` writes the result into each tool's own model list, and the tool
 enforces it: `--model`, the `/model` picker, and the default all obey.
-A layer or a checkout that would get around the list, such as a repo's
-`.claude/settings.json` widening it, refuses the launch with the file
-named. Every launch is logged to `~/.local/state/mi6/audit.jsonl` with
+`mi6 claude --model opus` is refused up front when Opus is not allowed,
+with the allowed names listed. A layer or a checkout that would get
+around the list, such as a repo's `.claude/settings.json` widening it,
+refuses the launch with the file named. Every launch is logged to `~/.local/state/mi6/audit.jsonl` with
 what was allowed and why.
 
 ```

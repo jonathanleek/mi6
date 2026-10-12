@@ -25,12 +25,18 @@ func (Claude) Env(dir string) []string {
 	return []string{"CLAUDE_CONFIG_DIR=" + dir}
 }
 
-// Model enforcement, verified on 2.1.285 with scripts/verify-enforcement.sh.
+// Model enforcement, verified on 2.1.296 with scripts/verify-enforcement.sh.
 // availableModels in the set's settings.json holds against --model, the
-// default, and the background request of a session; enforceAvailableModels
-// makes the default obey it. Project settings outrank it, an env can
-// redirect the API, and --settings replaces it, so those are refused.
-func (Claude) ID() models.ID       { return models.NamedID("claude") }
+// /model picker, a typed /model switch, the default, and the background
+// request of a session; enforceAvailableModels makes the default obey it.
+// --model is checked here too, so the refusal is explicit and names the
+// allowed models instead of a silent swap. Project settings outrank the
+// set's, an env can redirect the API, and --settings replaces it, so those
+// are refused.
+func (Claude) ID() models.ID { return models.NamedID("claude") }
+func (c Claude) Result(m *merge.Merged) *models.Result {
+	return m.Policy.Evaluate(c.Name(), c.ID())
+}
 func (Claude) ListKeys() []string  { return []string{"availableModels", "enforceAvailableModels"} }
 func (Claude) ModelKeys() []string { return []string{"model"} }
 func (Claude) Vars() []string {
@@ -40,7 +46,8 @@ func (Claude) Vars() []string {
 		"ANTHROPIC_BASE_URL",
 	}
 }
-func (Claude) Args() []string { return []string{"--settings", "--setting-sources"} }
+func (Claude) Args() []string      { return []string{"--settings", "--setting-sources"} }
+func (Claude) ModelArgs() []string { return []string{"--model"} }
 func (Claude) CheckoutFiles() []string {
 	return []string{".claude/settings.json", ".claude/settings.local.json"}
 }

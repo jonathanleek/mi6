@@ -203,6 +203,27 @@ and a passed-through `--settings`. Milestone 12 builds those refusals.
   researches each new model's maker and origin from real sources, proposes
   tags, waits for approval, and runs `mi6 tag`.
 
+### 18. Follow the tools' upgrades (done)
+
+OpenCode 2.0.25 enforces less than the design was verified against, and
+Claude Code 2.1.296 the same as before; the verified list has the
+details. Done on 2026-10-11:
+
+- `mi6` refuses a passed-through `--model` outside the list, so a launch
+  that would be silently swapped is refused with the allowed names
+  instead. Claude Code still replaces the flag itself.
+- OpenCode 2.x shares one background server across every launch, spawned
+  with the first launch's environment, so a second set ran under the
+  first set's config. The set now carries `service.json` with
+  `disabled: true`, which OpenCode reads from `OPENCODE_CONFIG_DIR`.
+- OpenCode's `whitelist` only hides from the picker now. A provider the
+  layers define gets a `models` map of exactly its allowed models, which
+  OpenCode does enforce; a built-in provider is dropped whole when the
+  policy removes any of its models, with the reason on each model that
+  went with it. `-m` is refused outside the list as well.
+- The tool files state these as facts through `Result` and `ModelArgs`,
+  and `scripts/verify-enforcement.sh` records the 2.x findings.
+
 ## README: compare with other tools
 
 Done in milestone 9. The comparison lives in the README.

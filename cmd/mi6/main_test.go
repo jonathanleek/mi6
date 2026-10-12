@@ -215,6 +215,7 @@ const testCatalog = `{
 func TestAuditLogsAPolicyLaunch(t *testing.T) {
 	home, state, project := fixture(t, true)
 	writeLayer(t, filepath.Join(home, ".mi6"), "models.json", testCatalog)
+	writeLayer(t, filepath.Join(home, ".mi6"), "opencode.json", `{"provider": {"lmstudio": {"npm": "x"}}}`)
 	r := mi6(t, home, state, project, nil, "opencode", "run", "hi")
 	if r.code != 0 {
 		t.Fatalf("exit %d\n%s", r.code, r.stderr)
@@ -246,6 +247,7 @@ func TestAuditLogsAPolicyLaunch(t *testing.T) {
 func TestPolicyRefusalIsLoggedAndBlocks(t *testing.T) {
 	home, state, project := fixture(t, true)
 	writeLayer(t, filepath.Join(home, ".mi6"), "models.json", testCatalog)
+	writeLayer(t, filepath.Join(home, ".mi6"), "opencode.json", `{"provider": {"lmstudio": {"npm": "x"}}}`)
 	// The tree layer allows only network models, which leaves Claude Code nothing.
 	writeLayer(t, filepath.Join(home, "git", ".mi6"), "models.json", `{"allow": ["network"]}`)
 	r := mi6(t, home, state, project, nil, "claude", "-p", "hi")
@@ -285,6 +287,7 @@ func TestUnwritableAuditLogRefuses(t *testing.T) {
 func TestResolveAndDoctorShowThePolicy(t *testing.T) {
 	home, state, project := fixture(t, true)
 	writeLayer(t, filepath.Join(home, ".mi6"), "models.json", testCatalog)
+	writeLayer(t, filepath.Join(home, ".mi6"), "opencode.json", `{"provider": {"lmstudio": {"npm": "x"}}}`)
 	r := mi6(t, home, state, project, nil, "resolve")
 	if r.code != 0 {
 		t.Fatalf("exit %d\n%s", r.code, r.stderr)

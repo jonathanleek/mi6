@@ -212,6 +212,7 @@ Each refusal names the file and layer at fault.
 | A layer sets a variable that redirects the tool's model | that tool |
 | The checkout's own tool settings touch models | that tool |
 | A passed-through argument replaces the tool's settings | that tool |
+| A passed-through `--model` names a model that is not allowed | that tool |
 | The tool has no way to enforce a model list | that tool |
 | The audit log cannot be written | every tool |
 
@@ -250,10 +251,13 @@ The tool does the enforcing. `mi6` writes the allowed list into the tool's
 settings in the set.
 
 **Claude Code.** `availableModels` gets the `claude` names of the allowed
-models, and `enforceAvailableModels` is `true`. A `--model` outside the list
-is replaced at start, `/model` refuses the switch, and the default model
-obeys the list. All three are verified below. `model` in the merged settings
-must be allowed.
+models, and `enforceAvailableModels` is `true`. A `--model` outside the
+list is replaced at start, the `/model` picker offers only the list and a
+typed `/model` outside it does not switch, and the default model obeys
+the list. All verified below, last on 2026-10-11. `mi6` refuses a
+passed-through `--model` outside the list as well, so the refusal is
+explicit and names the allowed models rather than a silent swap. `model`
+in the merged settings must be allowed.
 
 Variables can point Claude Code's model names somewhere else:
 `ANTHROPIC_MODEL`, `ANTHROPIC_DEFAULT_OPUS_MODEL`,
@@ -264,18 +268,30 @@ in the `env` key of `claude.json`, is refused, and `mi6` removes them from
 the environment it passes on, so one exported in your shell does not reach
 the tool either. `--settings` and `--setting-sources` in the arguments
 passed through are refused, since the first outranks the set's settings and
-the second changes what is read. Verified on 2026-09-29: a `--model`
-outside the list is replaced, the default model obeys the list, and so
-does the one background request an interactive session makes.
+the second changes what is read.
 
-**OpenCode.** `enabled_providers` gets the providers with an allowed model,
-which also shuts out any provider defined in `~/.config/opencode`.
-`provider.<id>.whitelist` gets each provider's allowed models. `model`,
-`small_model`, and every `agent.*.model` in the merged settings must be
-allowed. Verified on 2026-09-29: a model outside the lists is refused
-through `-m`, through the API the `/model` picker uses, as an agent's
-model, and as the default, with no request sent. A `small_model` outside
-the lists falls back to an allowed one.
+**OpenCode.** OpenCode blocks at two levels, verified on 2.0.25: a
+provider outside `enabled_providers` is unavailable, and so is a model
+absent from the `models` map of a provider the config defines. Its
+`whitelist` and `blacklist` only hide models from the picker; `-m` reaches
+them. So `enabled_providers` gets the providers with an allowed model; a
+provider the layers define, one with an `npm` package, gets a `models`
+map holding exactly its allowed models, since such a provider serves only
+what its map names; and a built-in provider, whose list comes from
+OpenCode, is enabled only when the policy removes none of its models,
+since nothing short of disabling it blocks one. `resolve` names the model that cost a built-in
+provider its place. A passed-through `-m` outside the list is refused as
+well. `model`, `small_model`, and every `agent.*.model` in the merged
+settings must be allowed. A built-in provider's models that are not in
+the catalog cannot be blocked one at a time either, so catalog every
+model such a provider serves; `mi6 models discover` lists them.
+
+Since 2.0 OpenCode runs one background server per user, registered in
+its state directory, and every launch attaches to it. The server is
+spawned with the first launch's environment, so a second set would run
+under the first set's config; verified. OpenCode reads `service.json`
+from `OPENCODE_CONFIG_DIR`, so the set carries one with `disabled: true`,
+and each launch runs its own server with its own config.
 
 OpenCode reads its config in a fixed order, and the set's file is read
 last of the files on disk because `mi6` sets `OPENCODE_CONFIG_DIR`. So
@@ -433,7 +449,8 @@ merges the key in and leaves the rest alone.
 `OPENCODE_CONFIG` at `<set>/opencode/opencode.json`. The build writes
 `AGENTS.md` from the merged instructions, `opencode.json` from the merged
 `opencode.json` files with the `mcp` key filled from the merged `mcp.json`,
-and `skills/<name>` links.
+`skills/<name>` links, and a `service.json` that keeps OpenCode 2.x from
+sharing one background server across sets.
 
 OpenCode differs from Claude Code in two ways that the launcher has to know:
 
@@ -579,6 +596,21 @@ Checked on 2026-09-23 and 2026-09-24 with Claude Code 2.1.281 and OpenCode
 - What follows the login rather than the config directory: the claude.ai
   connectors, and skills from plugins tied to the account. They appear in
   every set. Claude Code's built-in skills appear in every set too.
+- Model enforcement again on 2026-10-11, with Claude Code 2.1.296 and
+  OpenCode 2.0.25, after both upgraded. Claude Code enforces as before:
+  `--model opus` is replaced, the picker offers only the list, a typed
+  `/model opus` does not switch, and the default obeys. A first pass said
+  otherwise because the shell's `claude` was an alias for `mi6 claude`,
+  which pointed the run at a set with no list; call the binary by path
+  when checking. OpenCode enforces less than before:
+  `enabled_providers` still blocks, a model absent from a defined
+  provider's `models` map is unavailable, but `whitelist` and `blacklist`
+  only hide from the picker and `-m` reaches the hidden model. OpenCode 2.x
+  shares one background server per user, spawned with the first client's
+  environment: with it started from one set, a launch from another ran
+  under the first set's config, and `service.json` with `disabled: true`
+  in the set's config directory stopped that. The design's refusals and
+  the tool files follow these.
 - Model enforcement in both tools, on 2026-09-29 with Claude Code 2.1.285
   and OpenCode 1.18.30, against fake servers that record the model of every
   request, so no login is needed. `scripts/verify-enforcement.sh` repeats

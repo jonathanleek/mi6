@@ -49,7 +49,7 @@ func Check(in Input) []string {
 		return append(refusals, fmt.Sprintf("%s has no way to enforce a model list, so it cannot start under a policy", name))
 	}
 	file := name + ".json"
-	r := p.Evaluate(name, e.ID())
+	r := e.Result(in.Merged)
 
 	for _, l := range in.Layers {
 		where := in.Display(l.Path)
@@ -89,10 +89,22 @@ func Check(in Input) []string {
 		refusals = append(refusals, "no model is allowed here\n"+Explain(p, r))
 	}
 
-	for _, arg := range in.Args {
+	for i, arg := range in.Args {
 		for _, a := range e.Args() {
 			if arg == a || strings.HasPrefix(arg, a+"=") {
 				refusals = append(refusals, fmt.Sprintf("the argument %s replaces %s's settings, so under a policy it is refused", a, name))
+			}
+		}
+		for _, a := range e.ModelArgs() {
+			value, picks := "", false
+			switch {
+			case arg == a && i+1 < len(in.Args):
+				value, picks = in.Args[i+1], true
+			case strings.HasPrefix(arg, a+"="):
+				value, picks = strings.TrimPrefix(arg, a+"="), true
+			}
+			if picks && !r.Allows(value) {
+				refusals = append(refusals, fmt.Sprintf("the argument %s names %q, which is not allowed here; allowed: %s", a, value, strings.Join(r.IDs(), ", ")))
 			}
 		}
 	}

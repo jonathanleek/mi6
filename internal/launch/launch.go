@@ -131,7 +131,7 @@ func Run(name string, args []string, opts Options) error {
 	entry.Set = show(r.Dir)
 	var result *models.Result
 	if e, ok := t.(tool.Enforcer); ok {
-		result = r.Merged.Policy.Evaluate(name, e.ID())
+		result = e.Result(r.Merged)
 	}
 	entry.WithPolicy(r.Merged.Policy, result).WithDefault(enforce.Default(r.Merged.Settings(name)))
 	if len(refusals) > 0 {

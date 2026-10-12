@@ -159,7 +159,7 @@ func Run(opts Options) (*Report, error) {
 				add(Fail, "models", fmt.Sprintf("%s: %s", t.Name(), strings.ReplaceAll(r, "\n", "\n      ")))
 			}
 			if e, ok := t.(tool.Enforcer); ok && p.Active() {
-				summary = append(summary, fmt.Sprintf("%s %d allowed", t.Name(), len(p.Evaluate(t.Name(), e.ID()).Allowed)))
+				summary = append(summary, fmt.Sprintf("%s %d allowed", t.Name(), len(e.Result(m).Allowed)))
 			}
 			for _, v := range enforceVars(t) {
 				if _, set := os.LookupEnv(v); set {
