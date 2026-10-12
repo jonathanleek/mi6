@@ -262,7 +262,7 @@ func printModels(r *build.Result) {
 			fmt.Printf("  %-9s cannot enforce a model list\n", t.Name())
 			continue
 		}
-		res := p.Evaluate(t.Name(), e.ID())
+		res := e.Result(r.Merged)
 		fmt.Printf("  %-9s allowed  %s\n", t.Name(), strings.Join(res.IDs(), ", "))
 		for _, x := range res.Removed {
 			fmt.Printf("  %-9s removed  %-32s %s\n", "", x.Key, x.Why)

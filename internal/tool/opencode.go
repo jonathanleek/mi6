@@ -1,6 +1,7 @@
 package tool
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -34,22 +35,33 @@ func (OpenCode) Env(dir string) []string {
 	}
 }
 
-// Model enforcement, verified on 1.18.30 with scripts/verify-enforcement.sh.
-// enabled_providers and provider.<id>.whitelist in the set hold against -m,
-// the /model picker, agents, and the default, and win over the global and
-// the checkout's config because the set is read last of the files. The
+// Model enforcement, verified on 2.0.25 with scripts/verify-enforcement.sh.
+// OpenCode blocks at two levels: a provider outside enabled_providers is
+// unavailable, and so is a model absent from the models map of a provider
+// the config defines. whitelist and blacklist only hide models from the
+// picker; -m reaches them. So a defined provider keeps only its allowed
+// models, a built-in provider is enabled only when the policy removes none
+// of its models, since nothing short of disabling it blocks one, and -m is
+// checked here as well. The set's lists win over the global and the
+// checkout's config because the set is read last of the files; the
 // checkout can still set what the set does not, such as a provider's
 // address, and OPENCODE_CONFIG_CONTENT is read after the set, so those are
-// refused.
+// refused. OpenCode 2.x also shares one background server across every
+// launch, spawned with the first launch's environment; service.json in the
+// set turns that off so each launch reads its own config.
 func (OpenCode) ID() models.ID { return models.KeyID }
+func (o OpenCode) Result(m *merge.Merged) *models.Result {
+	return restrict(m.Policy.Evaluate(o.Name(), o.ID()), m.OpenCode)
+}
 func (OpenCode) ListKeys() []string {
 	return []string{"enabled_providers", "disabled_providers", "provider.*.whitelist", "provider.*.blacklist"}
 }
 func (OpenCode) ModelKeys() []string {
 	return []string{"model", "small_model", "agent.*.model", "mode.*.model"}
 }
-func (OpenCode) Vars() []string { return []string{"OPENCODE_CONFIG_CONTENT"} }
-func (OpenCode) Args() []string { return nil }
+func (OpenCode) Vars() []string      { return []string{"OPENCODE_CONFIG_CONTENT"} }
+func (OpenCode) Args() []string      { return nil }
+func (OpenCode) ModelArgs() []string { return []string{"--model", "-m"} }
 func (OpenCode) CheckoutFiles() []string {
 	return []string{"opencode.json", "opencode.jsonc", ".opencode/opencode.json", ".opencode/opencode.jsonc"}
 }
@@ -91,7 +103,7 @@ func (o OpenCode) Plan(m *merge.Merged, dir string) (*set.Plan, error) {
 		cfg["$schema"] = "https://opencode.ai/config.json"
 	}
 	if m.Policy != nil && m.Policy.Active() {
-		enforce(cfg, m.Policy.Evaluate(o.Name(), o.ID()))
+		enforce(cfg, o.Result(m))
 	}
 	if servers, ok := m.MCP["mcpServers"].(map[string]any); ok && len(servers) > 0 {
 		existing, _ := cfg["mcp"].(map[string]any)
@@ -107,6 +119,7 @@ func (o OpenCode) Plan(m *merge.Merged, dir string) (*set.Plan, error) {
 		Files: []set.File{
 			{Path: filepath.Join(dir, "AGENTS.md"), Content: []byte(m.Instructions)},
 			{Path: filepath.Join(dir, "opencode.json"), Content: cfgJSON},
+			{Path: filepath.Join(dir, "service.json"), Content: []byte("{\n  \"disabled\": true\n}\n")},
 		},
 		Links:    skillLinks(m, skillsDir),
 		LinkDirs: []string{skillsDir},
@@ -154,10 +167,47 @@ func translateMCP(servers map[string]any) layer.Object {
 	return out
 }
 
+// defined reports whether the config defines the provider, with an npm
+// package or a models map. Such a provider serves only the models its map
+// names, verified on 2.0.25, so the map is where the policy is enforced. A
+// built-in provider's list comes from OpenCode and cannot be narrowed.
+func defined(cfg layer.Object, provider string) bool {
+	entry := object(object(cfg["provider"])[provider])
+	_, npm := entry["npm"]
+	_, models := entry["models"].(map[string]any)
+	return npm || models
+}
+
+// restrict drops what OpenCode cannot keep apart: on a built-in provider
+// the policy can only disable the whole provider, so when it removes one
+// of that provider's models, the rest go too, with the reason.
+func restrict(r *models.Result, cfg layer.Object) *models.Result {
+	removed := map[string]string{}
+	for _, x := range r.Removed {
+		prov, _, _ := strings.Cut(x.Key, "/")
+		if _, seen := removed[prov]; !seen && !defined(cfg, prov) {
+			removed[prov] = x.Key
+		}
+	}
+	out := &models.Result{Tool: r.Tool, Active: r.Active, Removed: r.Removed}
+	for _, e := range r.Allowed {
+		prov, _, _ := strings.Cut(e.Key, "/")
+		if culprit, ok := removed[prov]; ok {
+			out.Removed = append(out.Removed, models.Removal{Key: e.Key, Tags: e.Tags,
+				Why: fmt.Sprintf("provider %s is built in and the policy removes %s; OpenCode can only drop the whole provider", prov, culprit)})
+			continue
+		}
+		out.Allowed = append(out.Allowed, e)
+	}
+	sort.Slice(out.Removed, func(i, j int) bool { return out.Removed[i].Key < out.Removed[j].Key })
+	return out
+}
+
 // enforce writes the allowed list into cfg: enabled_providers is the
-// providers with an allowed model, and each one's whitelist is its allowed
-// models. Providers are copied before they are changed, so the merged
-// settings stay as they were.
+// providers with an allowed model, a defined provider's models map keeps
+// only its allowed models, and each provider's whitelist hides the rest
+// from the picker. Providers are copied before they are changed, so the
+// merged settings stay as they were.
 func enforce(cfg layer.Object, r *models.Result) {
 	providers := layer.Object{}
 	for k, v := range object(cfg["provider"]) {
@@ -177,6 +227,17 @@ func enforce(cfg layer.Object, r *models.Result) {
 		entry := layer.Object{}
 		for k, v := range object(providers[prov]) {
 			entry[k] = v
+		}
+		if all, ok := entry["models"].(map[string]any); ok || defined(cfg, prov) {
+			kept := layer.Object{}
+			for _, model := range byProvider[prov] {
+				if v, ok := all[model]; ok {
+					kept[model] = v
+				} else {
+					kept[model] = layer.Object{}
+				}
+			}
+			entry["models"] = kept
 		}
 		entry["whitelist"] = byProvider[prov]
 		providers[prov] = entry

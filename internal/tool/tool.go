@@ -33,6 +33,10 @@ type Enforcer interface {
 	Tool
 	// ID says how the tool names a catalog model.
 	ID() models.ID
+	// Result is what the tool may use under the merged policy: the policy's
+	// evaluation, narrowed further where the tool cannot enforce as finely
+	// as the catalog, with the reason on each model it drops.
+	Result(m *merge.Merged) *models.Result
 	// ListKeys are the settings keys that hold a model list or switch its
 	// enforcement. The policy owns them: Plan writes them, and a layer or
 	// the checkout that sets one is refused.
@@ -47,6 +51,9 @@ type Enforcer interface {
 	// Args are the passed-through arguments that replace or reselect the
 	// tool's settings. They are refused.
 	Args() []string
+	// ModelArgs are the passed-through arguments that pick a model. Their
+	// value must be allowed, since the tool may not check it itself.
+	ModelArgs() []string
 	// CheckoutFiles are the checkout's own settings files, which outrank
 	// the set's. They are looked for in every directory from the working
 	// directory up to the checkout root. One that sets a ListKey, a
@@ -66,6 +73,13 @@ type Enforcer interface {
 }
 
 var registry = map[string]Tool{}
+
+// Both shipped tools enforce; a tool that stops would be refused under a
+// policy, so say so at compile time.
+var (
+	_ Enforcer = Claude{}
+	_ Enforcer = OpenCode{}
+)
 
 func register(t Tool) { registry[t.Name()] = t }
 

@@ -107,20 +107,25 @@ export OPENCODE_CONFIG_DIR=$SET/opencode OPENCODE_CONFIG=$SET/opencode/opencode.
 ## Model policy
 
 The example tree denies `chinese` at the top and `frontier` under
-`clients/`, so the globex set allows Claude Code `haiku` and `sonnet` and
-OpenCode those two plus `lmstudio/gpt-oss-120b`.
+`clients/`, so the globex set allows Claude Code `haiku` and `sonnet`.
+OpenCode gets `lmstudio/gpt-oss-120b` alone: Anthropic is a built-in
+provider, OpenCode cannot drop Opus from it one model at a time, so the
+whole provider goes, and `resolve` says which model cost it its place.
+The clients layer sets the local model as OpenCode's default for that
+reason.
 
 - `m resolve` ends with a `models` section that says so, and names the
   layer behind each removed model.
 - `m models` lists every catalog model with its tags and its standing per
   tool. `m tags` lists the five tags with how many models carry each.
 - `m doctor` says `ok models policy in force: claude 2 allowed, opencode
-  3 allowed` and `ok audit`.
+  1 allowed` and `ok audit`.
 - In the Claude Code session above, `/model` offers Sonnet and Haiku and
-  refuses Opus. `claude --model opus -p "which model are you"` under the
-  set answers as Sonnet.
-- `opencode debug config` under the set shows `enabled_providers` and a
-  `whitelist` under each provider. `opencode models` lists only the three.
+  a typed `/model opus` does not switch. `m claude --model opus` is refused
+  with the allowed names listed; `claude --model opus -p "which model are
+  you"` under the set, with the binary called by path, answers as Sonnet.
+- `opencode models` under the set lists `lmstudio/gpt-oss-120b` alone,
+  and `m opencode -m anthropic/claude-sonnet-5` is refused.
 - `m claude --settings '{}'` is refused with the argument named.
 - Write `{"availableModels": ["opus"]}` to
   `$SB/home/Documents/git/work/clients/globex/pipeline/.claude/settings.json`.

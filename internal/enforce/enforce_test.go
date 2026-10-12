@@ -45,6 +45,9 @@ func input(t *testing.T, name string, home, near *layer.Layer, args ...string) I
 	if home.Models == nil {
 		home.Models = obj(t, catalog)
 	}
+	if home.OpenCode == nil {
+		home.OpenCode = obj(t, `{"provider": {"lmstudio": {"npm": "x"}}}`)
+	}
 	layers := []*layer.Layer{home, near}
 	tl, err := tool.Lookup(name)
 	if err != nil {
@@ -92,9 +95,82 @@ func TestToolThatCannotEnforce(t *testing.T) {
 func TestClean(t *testing.T) {
 	near := &layer.Layer{Claude: obj(t, `{"model": "sonnet", "permissions": {"deny": ["x"]}}`), OpenCode: obj(t, `{"model": "lmstudio/gpt-oss-120b", "small_model": "anthropic/claude-sonnet-5", "agent": {"build": {"model": "anthropic/claude-sonnet-5"}}}`)}
 	for _, name := range []string{"claude", "opencode"} {
-		if got := Check(input(t, name, &layer.Layer{}, near, "-p", "hi", "--model", "opus")); got != nil {
+		args := []string{"-p", "hi", "--model", "sonnet"}
+		if name == "opencode" {
+			args = []string{"run", "-m", "lmstudio/gpt-oss-120b", "--model=anthropic/claude-sonnet-5"}
+		}
+		if got := Check(input(t, name, &layer.Layer{}, near, args...)); got != nil {
 			t.Errorf("%s: %v", name, got)
 		}
+	}
+}
+
+func TestModelArgument(t *testing.T) {
+	got := Check(input(t, "claude", &layer.Layer{}, &layer.Layer{}, "--model", "opus", "-p"))
+	if len(got) != 1 || !has(got, `the argument --model names "opus", which is not allowed here; allowed: sonnet`) {
+		t.Errorf("claude: %v", got)
+	}
+	got = Check(input(t, "claude", &layer.Layer{}, &layer.Layer{}, "--model=claude-opus-5-5"))
+	if len(got) != 1 || !has(got, `names "claude-opus-5-5"`) {
+		t.Errorf("claude =form: %v", got)
+	}
+	got = Check(input(t, "opencode", &layer.Layer{}, &layer.Layer{}, "run", "-m", "lmstudio/qwen3-coder-30b"))
+	if len(got) != 1 || !has(got, `the argument -m names "lmstudio/qwen3-coder-30b"`) {
+		t.Errorf("opencode: %v", got)
+	}
+	if got := Check(input(t, "claude", &layer.Layer{}, &layer.Layer{}, "--model")); got != nil {
+		t.Errorf("a trailing --model with no value is the tool's problem: %v", got)
+	}
+}
+
+// A built-in provider cannot be narrowed to single models, so when the
+// policy removes one of its models OpenCode loses the whole provider, with
+// the reason on each model that went with it.
+func TestBuiltInProviderGoesWhole(t *testing.T) {
+	home := &layer.Layer{Models: obj(t, `{
+		"tags": {"chinese": "Made in China", "network": "On the LAN", "frontier": "Largest tier"},
+		"providers": {"anthropic": {}, "lmstudio": {"tags": ["network"]}, "opencode": {}},
+		"models": {
+			"anthropic/claude-sonnet-5": {"claude": "sonnet"}, "anthropic/claude-opus-5": {"tags": ["frontier"], "claude": "opus"},
+			"lmstudio/qwen3-coder-30b": {"tags": ["chinese"]}, "lmstudio/gpt-oss-120b": {},
+			"opencode/nemotron-3-ultra-free": {}, "opencode/mimo-v2.6-flash-free": {"tags": ["chinese"]}
+		},
+		"deny": ["chinese", "frontier"]}`), OpenCode: obj(t, `{"provider": {"lmstudio": {"npm": "x", "models": {"qwen3-coder-30b": {"name": "Qwen"}, "gpt-oss-120b": {}}}}}`)}
+	in := input(t, "opencode", home, &layer.Layer{})
+	r := in.Tool.(tool.Enforcer).Result(in.Merged)
+	if got := strings.Join(r.IDs(), " "); got != "lmstudio/gpt-oss-120b" {
+		t.Errorf("allowed %q", got)
+	}
+	why := map[string]string{}
+	for _, x := range r.Removed {
+		why[x.Key] = x.Why
+	}
+	if why["anthropic/claude-sonnet-5"] != "provider anthropic is built in and the policy removes anthropic/claude-opus-5; OpenCode can only drop the whole provider" {
+		t.Errorf("sonnet: %q", why["anthropic/claude-sonnet-5"])
+	}
+	if !strings.HasPrefix(why["opencode/nemotron-3-ultra-free"], "provider opencode is built in") || why["lmstudio/qwen3-coder-30b"] != "deny chinese (/home/.mi6)" {
+		t.Errorf("removed %v", why)
+	}
+	// The plan enables lmstudio alone and narrows its models map to the allowed model, keeping its entry.
+	plan, err := in.Tool.Plan(in.Merged, "/set/opencode")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := parsePlan(t, plan, "opencode.json")
+	if !reflect.DeepEqual(cfg["enabled_providers"], []any{"lmstudio"}) {
+		t.Errorf("enabled_providers %v", cfg["enabled_providers"])
+	}
+	lm := cfg["provider"].(map[string]any)["lmstudio"].(map[string]any)
+	if !reflect.DeepEqual(lm["models"], map[string]any{"gpt-oss-120b": map[string]any{}}) || !reflect.DeepEqual(lm["whitelist"], []any{"gpt-oss-120b"}) {
+		t.Errorf("lmstudio %v", lm)
+	}
+	// Claude Code is unaffected: it names models, not providers.
+	if got := strings.Join(in.Tool.(tool.Enforcer).Result(in.Merged).IDs(), " "); got != "lmstudio/gpt-oss-120b" {
+		t.Errorf("%q", got)
+	}
+	ci := input(t, "claude", home, &layer.Layer{})
+	if got := strings.Join(ci.Tool.(tool.Enforcer).Result(ci.Merged).IDs(), " "); got != "sonnet" {
+		t.Errorf("claude %q", got)
 	}
 }
 
@@ -278,8 +354,11 @@ func TestPlansWriteTheLists(t *testing.T) {
 		t.Errorf("enabled_providers %v", cfg["enabled_providers"])
 	}
 	lm := cfg["provider"].(map[string]any)["lmstudio"].(map[string]any)
-	if lm["npm"] != "x" || !reflect.DeepEqual(lm["whitelist"], []any{"gpt-oss-120b"}) {
+	if lm["npm"] != "x" || !reflect.DeepEqual(lm["whitelist"], []any{"gpt-oss-120b"}) || !reflect.DeepEqual(lm["models"], map[string]any{"gpt-oss-120b": map[string]any{}}) {
 		t.Errorf("lmstudio %v", lm)
+	}
+	if svc := parsePlan(t, plan, "service.json"); svc["disabled"] != true {
+		t.Errorf("service.json %v", svc)
 	}
 	an := cfg["provider"].(map[string]any)["anthropic"].(map[string]any)
 	if !reflect.DeepEqual(an["whitelist"], []any{"claude-sonnet-5"}) {

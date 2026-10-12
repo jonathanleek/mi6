@@ -170,7 +170,7 @@ func listModels() int {
 	results := map[string]*models.Result{}
 	for _, t := range tool.All() {
 		if e, ok := t.(tool.Enforcer); ok {
-			results[t.Name()] = p.Evaluate(t.Name(), e.ID())
+			results[t.Name()] = e.Result(s.merged)
 		}
 	}
 	fmt.Println()
