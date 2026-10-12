@@ -226,6 +226,12 @@ details. Done on 2026-10-11:
 
 ### Not in v3
 
+- **A retry in `discover`.** `opencode models` through OpenCode 2.x's
+  background server came back empty twice on 2026-10-12, each time on
+  the first call after the server had been idle, and listed everything
+  on the next call. `discover` then reports no models. A second attempt
+  when the first returns nothing would cover it. Run it again meanwhile.
+
 - **OpenAPPA.** A data-flow guardrail for Claude Code, studied on
   2026-09-30 at v0.30.0, the day it was released. It would complement the
   model policy, not overlap it. Not now, because it is a preview whose
