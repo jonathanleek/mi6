@@ -547,6 +547,16 @@ sketch, so it can come back without re-deciding it.
   since it can serve any model under the name `sonnet`. A layer that sets it
   could instead name the provider it points at, so that provider's tags
   apply. Wait until a gateway is in use.
+- **Data-flow policy per folder, with OpenAPPA.** `mi6` decides which
+  config and models apply in a folder; it says nothing about where data
+  read in a session may go. [OpenAPPA](https://github.com/archestra-ai/openappa)
+  does that: a session carries an audience and a trust label that only
+  tighten, and a local runtime decides each tool call from them, outside
+  the model. It has one `appa.toml` per user and no per-folder policy,
+  which is the gap a layer fills: a client layer could declare that what
+  is read in its repos has that client as its audience, and nothing read
+  there could reach a public repo or another client's system. Studied on
+  2026-09-30 at v0.30.0; the plan has the sketch and the reasons to wait.
 - **Accounts.** Each set has its own Claude Code login. That is verified:
   a fresh config directory starts logged out, and on macOS the login is a
   Keychain item keyed to the config directory, not a file in it. So there
